@@ -1,4 +1,13 @@
-.idea/
-build/
-.gradle/
-out/
+.idea/*
+**/.idea/*
+*.iml
+.gradle
+local.properties
+
+*~
+
+build
+src/jsMain/web
+
+!.idea/runConfigurations
+!.idea/runConfigurations/*
