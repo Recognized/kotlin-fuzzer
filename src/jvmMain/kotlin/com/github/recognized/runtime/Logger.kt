@@ -22,10 +22,11 @@ class Logger(private val parent: Logger) {
         }
     }
 
-    fun error(msg: () -> Any) {
+    fun error(msg: () -> Any): Nothing? {
         if (parent.isErrorEnabled) {
             parent.error(msg().toString())
         }
+        return null
     }
 
     fun error(ex: Throwable) {

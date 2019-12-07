@@ -68,7 +68,7 @@ object Server : CoroutineScope, Disposable by Disposer.newDisposable() {
                 compilations.incrementAndGet()
                 val score = fitness.score(afterText)
                 if (score == null) {
-                    log.info { "Failed to get score" }
+                    log.error { "Failed to get score" }
                 } else {
                     log.info { "Score: $score" }
                     log.info { "After: $afterText" }

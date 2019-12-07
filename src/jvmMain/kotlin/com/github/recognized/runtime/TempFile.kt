@@ -3,11 +3,13 @@ package com.github.recognized.runtime
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.util.Disposer
 import java.nio.file.Files
+import java.nio.file.Path
 
 class TempFile(contents: String, parentDisposable: Disposable? = null) : Disposable {
     private val tempDir = Files.createTempDirectory("compile")
-    private val tempFile = Files.createTempFile(tempDir, "temp", "kt_fuzzer").toAbsolutePath()
-    val path: String get() = tempFile.toString()
+    private val tempFile = Files.createFile(tempDir.resolve("Fuzzer.kt")).toAbsolutePath()
+    val file: Path get() = tempFile
+    val dir: Path get() = tempDir
 
     init {
         parentDisposable?.let {
