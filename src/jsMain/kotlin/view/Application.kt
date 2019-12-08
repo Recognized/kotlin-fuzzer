@@ -78,12 +78,18 @@ class ApplicationComponent : RComponent<ApplicationProps, ApplicationState>(), C
                             tr {
                                 +"Uptime"
                             }
+                            tr {
+                                +"State"
+                            }
                         }
                     }
                     tbody {
                         td {
                             tr {
                                 +"00:00:00"
+                            }
+                            tr {
+                                +"Paused"
                             }
                         }
                     }

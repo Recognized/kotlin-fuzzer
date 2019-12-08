@@ -1,6 +1,7 @@
 package com.github.recognized.mutation
 
 import com.github.recognized.dataset.Corpus
+import com.github.recognized.dataset.Sample
 import com.github.recognized.runtime.commonSuperClass
 import com.github.recognized.runtime.logger
 import com.intellij.psi.PsiElement
@@ -13,8 +14,8 @@ import kotlin.random.Random
 class Replace(val random: Random) : Mutation {
     private val log = logger()
 
-    override fun mutate(corpus: Corpus, tree: KtElement) {
-        val replacement = corpus.samples().shuffled(random).firstNotNull { sample ->
+    override fun mutate(corpus: List<Sample>, tree: KtElement) {
+        val replacement = corpus.shuffled(random).firstNotNull { sample ->
             sample.tree?.asSequence()?.toList()?.shuffled(random)?.firstNotNull { element ->
                 element.takeIf { swappable(it, tree) }
             }

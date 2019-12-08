@@ -5,12 +5,15 @@ import com.github.recognized.dataset.corpuses
 import com.github.recognized.metrics.FitnessFunction
 import com.github.recognized.metrics.getCompileTimeFitnessFunction
 import com.github.recognized.mutation.mutations
+import com.github.recognized.service.Kernel
 import org.kodein.di.Kodein
 import org.kodein.di.generic.bind
 import org.kodein.di.generic.instance
 import org.kodein.di.generic.singleton
 import org.kodein.di.generic.with
 import java.net.URLClassLoader
+import kotlin.math.exp
+import kotlin.math.sqrt
 import kotlin.random.Random
 
 const val KOTLIN_HOME = "kotlinHome"
@@ -28,6 +31,12 @@ fun Kodein.MainBuilder.mainKodein() {
             instance(KOTLIN_HOME),
             instance(CLASSPATH)
         )
+    }
+    bind<Kernel>() with singleton {
+        Kernel("gaussian") {
+            val x = it / 1000
+            1.0 / sqrt(2.0 * Math.PI) * exp(-0.5 * x * x)
+        }
     }
 
     mutations()

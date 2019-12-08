@@ -135,6 +135,7 @@ fun getCompileTimeFitnessFunction(target: CompileTarget, kotlinHome: String, cla
                 K2JVMCompilerArguments().apply {
                     reportPerf = true
                     this.kotlinHome = kotlinHome
+                    this.destination = "outDir"
                     version = true
                 }
             }

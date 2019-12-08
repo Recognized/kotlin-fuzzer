@@ -88,7 +88,8 @@ fun loadData(dataDir: Path): CodeCount {
 
 class YouTrackCorpus(facade: PsiFacade) : Corpus {
     private val data by lazy {
-        loadData(Paths.get("data", "youtrack")).codes.map { LazySample(facade, it.code) }
+        loadData(Paths.get("data", "youtrack")).codes.withIndex()
+            .map { IdSample("YT-${it.index}", LazySample(facade, it.value.code)) }
     }
 
     override fun samples(): List<Sample> = data
