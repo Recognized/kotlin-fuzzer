@@ -12,7 +12,7 @@ import org.jetbrains.kotlin.psi.psiUtil.astReplace
 import kotlin.random.Random
 
 class Replace(val random: Random) : Mutation {
-    private val log = logger()
+    private val log = logger("Replace")
 
     override fun mutate(corpus: List<Sample>, tree: KtElement) {
         val replacement = corpus.shuffled(random).firstNotNull { sample ->

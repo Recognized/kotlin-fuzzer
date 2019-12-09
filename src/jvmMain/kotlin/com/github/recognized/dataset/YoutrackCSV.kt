@@ -25,7 +25,7 @@ class CodeCount(val count: Int, val success: Boolean, val codes: List<Code>)
 @Serializable
 class Code(val code: String)
 
-private val log = logger()
+private val log = logger("YouTrack")
 
 fun main() {
 
@@ -56,7 +56,7 @@ fun main() {
 }
 
 fun splitCanCompile(data: Collection<String>): Map<Boolean, List<String>> {
-    val log = logger { "SplitByCompile" }
+    val log = logger("SplitByCompile")
     return disposing {
         val jvmFacade = PsiFacade(it, CompileTarget.Jvm)
         val jsFacade = PsiFacade(it, CompileTarget.Jvm)

@@ -4,8 +4,8 @@ import io.ktor.util.error
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
-fun logger(name: () -> String? = { null }): com.github.recognized.runtime.Logger {
-    return Logger(LoggerFactory.getLogger(name() ?: name::class.java.name.substringBefore('$')))
+fun logger(name: String): com.github.recognized.runtime.Logger {
+    return Logger(LoggerFactory.getLogger(name))
 }
 
 class Logger(private val parent: Logger) {

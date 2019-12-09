@@ -27,6 +27,6 @@ class FuzzerImpl : Fuzzer {
 fun List<Sample>.sortedBy(order: SortOrder): List<Sample> {
     val kernel by kodein.instance<Kernel>()
     return when (order) {
-        SortOrder.Score -> sortedBy { it.metrics!!.value(kernel) }
+        SortOrder.Score -> sortedByDescending { it.metrics!!.value(kernel) }
     }
 }

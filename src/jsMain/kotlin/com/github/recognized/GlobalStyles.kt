@@ -1,3 +1,5 @@
+package com.github.recognized
+
 import kotlinext.js.invoke
 import kotlinx.css.*
 import kotlinx.css.properties.lh

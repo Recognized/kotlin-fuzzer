@@ -38,12 +38,12 @@ fun stringify(param: KParameter): String {
 
 fun CodeWriter.generateRPCClientExtensions(service: KClass<*>) {
     val name = service.simpleName!!.substringAfterLast(".")
-    line { "val HttpClient.$name get() = ${name}Proxy(this)" }
+    line { "val HttpClient.$name : ${service.qualifiedName} get() = ${name}Proxy(this)" }
     block("class ${name}Proxy(val client: HttpClient) : ${service.qualifiedName!!}") {
         service.declaredFunctions.forEach { method ->
             val args = method.parameters.drop(1).joinToString(separator = ", ") { "${it.name}: ${it.type}" }
             block("override suspend fun ${method.name}($args): ${method.returnType}") {
-                block("""val result___ = client.get<String>(server + "/api/$name")""") {
+                block("""val result___ = client.get<String>(server + "/api/$name/${method.name}")""") {
                     method.parameters.drop(1).forEach {
                         parameter(it)
                     }
@@ -76,6 +76,8 @@ fun generate(classes: List<KClass<*>>) {
             line { "import com.github.recognized.parse" }
             line { "import com.github.recognized.stringify" }
             line { "import kotlinx.serialization.serializer" }
+            line { "import com.github.recognized.server" }
+            line { "import kotlinx.serialization.list" }
             for (clazz in classes) {
                 generateRPCClientExtensions(clazz)
             }

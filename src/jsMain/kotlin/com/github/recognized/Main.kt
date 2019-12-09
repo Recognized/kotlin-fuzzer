@@ -1,8 +1,10 @@
+package com.github.recognized
+
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import react.buildElement
 import react.dom.render
-import view.ApplicationComponent
+import com.github.recognized.view.ApplicationComponent
 import kotlin.browser.document
 import kotlin.coroutines.CoroutineContext
 

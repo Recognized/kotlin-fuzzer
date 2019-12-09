@@ -12,10 +12,7 @@ import com.github.recognized.service.Metrics
 import com.github.recognized.service.Statistics
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.util.Disposer
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.*
 import org.jetbrains.kotlin.psi.KtElement
 import org.kodein.di.generic.instance
 import java.io.File
@@ -24,15 +21,15 @@ import kotlin.coroutines.CoroutineContext
 import kotlin.random.Random
 
 object Server : CoroutineScope, Disposable by Disposer.newDisposable() {
-    private const val GENERATION_SIZE = 1000
-    private val log = logger()
+    private const val GENERATION_SIZE = 200
+    private val log = logger("Server")
     override val coroutineContext: CoroutineContext = Job()
 
     private var startJob: Job? = null
 
-    private val start = AtomicLong()
-    private val generations = AtomicLong()
-    private val compilations = AtomicLong()
+    private val start = AtomicLong(0L)
+    private val generations = AtomicLong(0L)
+    private val compilations = AtomicLong(0L)
     private val successfulCompilations = AtomicLong()
     private val corpuses by kodein.instance<AllCorpuses>()
     private val allMutations by kodein.instance<AllMutations>()
@@ -66,10 +63,10 @@ object Server : CoroutineScope, Disposable by Disposer.newDisposable() {
 
     fun stat(): Statistics {
         return Statistics(
-            start.get().takeIf { it != 0L }?.let { System.currentTimeMillis() - it } ?: 0L,
-            generations.get(),
-            compilations.get() / successfulCompilations.get().toDouble(),
-            state
+            uptime = start.get().takeIf { it != 0L }?.let { (System.currentTimeMillis() - it) / 1000 } ?: 0L,
+            iterations = generations.get(),
+            compileSuccessRate = if (successfulCompilations.get() != 0L) compilations.get() / successfulCompilations.get().toDouble() else 0.0,
+            state = state
         )
     }
 
@@ -81,7 +78,6 @@ object Server : CoroutineScope, Disposable by Disposer.newDisposable() {
             loadInitialGeneration()
 
             while (true) {
-
                 crossover()
                 mutate()
 
@@ -92,8 +88,10 @@ object Server : CoroutineScope, Disposable by Disposer.newDisposable() {
         }
     }
 
-    private fun loadInitialGeneration() = state("Loading initial generation") {
-        generation = corpuses.samples().mapNotNull {
+    private fun loadInitialGeneration() {
+        val newGen = mutableListOf<Sample>()
+        generation = newGen
+        corpuses.samples().asSequence().mapNotNull {
             val tree = it.tree
             if (it.metrics == null && tree != null) {
                 val score = fitness.score(tree.text)
@@ -111,7 +109,11 @@ object Server : CoroutineScope, Disposable by Disposer.newDisposable() {
             } else {
                 null
             }
-        }.take(GENERATION_SIZE)
+        }.take(GENERATION_SIZE).forEach {
+            state("Loading initial generation ${newGen.size}") {
+                newGen += it
+            }
+        }
     }
 
     private fun crossover() = state("Crossover #${generations.get() + 1}") {
@@ -143,7 +145,12 @@ object Server : CoroutineScope, Disposable by Disposer.newDisposable() {
                 if (score == null) {
                     log.error { "Failed to get score" }
                 } else {
-                    val psiCount = facade.getPsi(afterText)?.asSequence()?.count()
+                    val psiCount = try {
+                        facade.getPsi(afterText)?.asSequence()?.count()
+                    } catch (ex: Throwable) {
+                        log.error(ex)
+                        return@state
+                    }
                     log.info { "Score: $score" }
                     log.info { "After: $afterText" }
                     if (psiCount != null) {
@@ -166,7 +173,7 @@ object Server : CoroutineScope, Disposable by Disposer.newDisposable() {
     }
 
     private fun nextId(): String {
-        return "GN-" + generations.get() + "-" + Random.nextLong().let { it }.toString(64)
+        return "GN-" + generations.get() + "-" + Random.nextLong().let { it }.toString(16)
     }
 
     private fun filter() {
@@ -178,13 +185,8 @@ object Server : CoroutineScope, Disposable by Disposer.newDisposable() {
     }
 
     private fun <T> state(name: String, fn: () -> T): T {
-        val oldState = state
         state = name
-        try {
-            return fn()
-        } finally {
-            state = oldState
-        }
+        return fn()
     }
 
     @Synchronized

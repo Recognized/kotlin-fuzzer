@@ -28,7 +28,7 @@ import org.jetbrains.kotlin.psi.KtFile
 import java.io.File
 import java.net.URLClassLoader
 
-private val log = logger()
+private val log = logger("PsiFacade")
 
 class PsiFacade(
     parentDisposable: Disposable,

@@ -28,7 +28,7 @@ data class Score(
     val compiled: Boolean
 )
 
-private val log = logger()
+private val log = logger("Metrics")
 
 class CompileTimeFitnessFunction<T : CommonCompilerArguments>(
     private val compiler: CLICompiler<T>, private val arguments: () -> T
@@ -37,7 +37,12 @@ class CompileTimeFitnessFunction<T : CommonCompilerArguments>(
     private var previousAbsoluteJitMark = 0
 
     override fun score(code: String): Score? {
-        val exitCode = doCompile(code)
+        val exitCode = try {
+            doCompile(code)
+        } catch (ex: Throwable) {
+            log.error(ex)
+            ExitCode.INTERNAL_ERROR
+        }
         log.info { "exit code: $exitCode" }
         return makeScore(exitCode)
     }
@@ -63,6 +68,7 @@ class CompileTimeFitnessFunction<T : CommonCompilerArguments>(
             val exitCode = compiler.exec(messageCollector, Services.EMPTY, args)
             messageCollector.others()
             reportErrors()
+            reportOthers()
             return exitCode
         }
     }
@@ -70,6 +76,12 @@ class CompileTimeFitnessFunction<T : CommonCompilerArguments>(
     private fun reportErrors() {
         messageCollector.errors().forEach {
             log.error { it }
+        }
+    }
+
+    private fun reportOthers() {
+        messageCollector.others().forEach {
+            log.info { it }
         }
     }
 
