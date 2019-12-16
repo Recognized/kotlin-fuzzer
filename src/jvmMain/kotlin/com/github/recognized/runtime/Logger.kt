@@ -29,6 +29,12 @@ class Logger(private val parent: Logger) {
         return null
     }
 
+    fun trace(msg: () -> Any) {
+        if (parent.isTraceEnabled) {
+            parent.trace(msg().toString())
+        }
+    }
+
     fun error(ex: Throwable) {
         if (parent.isErrorEnabled) {
             parent.error(ex)

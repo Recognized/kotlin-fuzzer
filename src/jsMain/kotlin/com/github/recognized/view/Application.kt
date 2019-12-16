@@ -5,6 +5,7 @@ import com.github.recognized.App
 import com.github.recognized.horizontal
 import com.github.recognized.service.Snippet
 import com.github.recognized.service.SortOrder
+import com.github.recognized.service.State
 import com.github.recognized.service.Statistics
 import com.github.recognized.spring
 import com.github.recognized.vertical
@@ -31,7 +32,7 @@ class ApplicationComponent : RComponent<ApplicationProps, Timestamp>(), Coroutin
         state = Timestamp(0)
     }
 
-    private var st: ApplicationState = ApplicationState(Statistics(0, 0, 0.0, "Idle"), emptyList())
+    private var st: ApplicationState = ApplicationState(Statistics(0, State.Stop, 0, 0.0, "Idle"), emptyList())
 
     private fun update(action: () -> Unit) {
         setState(transformState = {
@@ -102,17 +103,45 @@ class ApplicationComponent : RComponent<ApplicationProps, Timestamp>(), Coroutin
 
                 spring()
 
+
+                if (st.stat.run != State.Stop) {
+                    ringButton {
+                        attrs {
+                            onMouseDown = {
+                                launch {
+                                    App.client.Fuzzer.stop()
+                                }
+                            }
+                            danger = true
+                        }
+
+                        +"Stop"
+                    }
+                }
+
+                gap(8.px)
+
                 ringButton {
                     attrs {
                         onMouseDown = {
                             launch {
-                                App.client.Fuzzer.start()
+                                val fz = App.client.Fuzzer
+                                when (st.stat.run) {
+                                    State.Paused, State.Start -> fz.togglePause()
+                                    State.Stop -> fz.start()
+                                }
                             }
                         }
                     }
 
-                    +"Start"
+                    +when (st.stat.run) {
+                        State.Paused -> "Unpause"
+                        State.Stop -> "Start"
+                        State.Start -> "Pause"
+                    }
                 }
+
+                gap(8.px)
 
                 table {
                     thead {
@@ -209,7 +238,9 @@ class ApplicationComponent : RComponent<ApplicationProps, Timestamp>(), Coroutin
             }
             key = sample.id
             td {
-                +sample.id
+                a("/code?id=${sample.id}") {
+                    +sample.id
+                }
             }
             td {
                 +sample.value.toString()
@@ -227,6 +258,15 @@ class ApplicationComponent : RComponent<ApplicationProps, Timestamp>(), Coroutin
     }
 }
 
+fun RBuilder.gap(size: LinearDimension) {
+    styledDiv {
+        css {
+            display = Display.flex
+            flexBasis = FlexBasis("$size")
+            grow(Grow.NONE)
+        }
+    }
+}
 
 fun Number.twoDigit(): String {
     return toString().let { if (it.length == 1) "0$it" else it }

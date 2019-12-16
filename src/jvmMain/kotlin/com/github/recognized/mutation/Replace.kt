@@ -1,7 +1,7 @@
 package com.github.recognized.mutation
 
-import com.github.recognized.dataset.Corpus
 import com.github.recognized.dataset.Sample
+import com.github.recognized.random.Chooser
 import com.github.recognized.runtime.commonSuperClass
 import com.github.recognized.runtime.logger
 import com.intellij.psi.PsiElement
@@ -11,31 +11,36 @@ import org.jetbrains.kotlin.psi.KtPureElement
 import org.jetbrains.kotlin.psi.psiUtil.astReplace
 import kotlin.random.Random
 
-class Replace(val random: Random) : Mutation {
-    private val log = logger("Replace")
+private val log = logger("Replace")
 
-    override fun mutate(corpus: List<Sample>, tree: KtElement) {
-        val replacement = corpus.shuffled(random).firstNotNull { sample ->
-            sample.tree?.asSequence()?.toList()?.shuffled(random)?.firstNotNull { element ->
-                element.takeIf { swappable(it, tree) }
+class Replace(val random: Random, val subtreeChooser: Chooser<PsiElement, PsiElement>) : Mutation {
+
+    override fun mutate(corpus: List<Sample>, sample: Sample): String? {
+        val tree = sample.tree ?: error("Psi construction failed")
+        val forReplace = subtreeChooser.choose(random, tree)!!
+        val replacement = corpus.shuffled(random).firstNotNull {
+            val breed = it.tree ?: return@firstNotNull null
+            subtreeChooser.choose(random, breed) {
+                swappable(it, forReplace)
             }
-        } as KtElement? ?: return
-        log.info { "Replacing ${tree::class.simpleName}{${tree.text}} with ${replacement::class.simpleName}{${replacement.text}}" }
-        tree.astReplace(replacement)
+        } as KtElement? ?: return null
+        log.trace { "Replacing ${forReplace::class.simpleName}{${forReplace.text}} with ${replacement::class.simpleName}{${replacement.text}}" }
+        forReplace.astReplace(replacement)
+        return tree.text
     }
+}
 
-    fun swappable(one: PsiElement, other: PsiElement): Boolean {
-        val commonSuperClasses = commonSuperClass(one::class.java, other::class.java).filter {
-            KtElement::class.java.isAssignableFrom(it)
-                    && it != KtElement::class.java
-                    && it != KtElementImplStub::class.java
-                    && it != KtPureElement::class.java
-        }
-        if (commonSuperClasses.isNotEmpty()) {
-            log.info { "Common super classes for ${one::class.simpleName} and ${other::class.simpleName} = $commonSuperClasses" }
-        }
-        return commonSuperClasses.isNotEmpty()
+fun swappable(one: PsiElement, other: PsiElement): Boolean {
+    val commonSuperClasses = commonSuperClass(one::class.java, other::class.java).filter {
+        KtElement::class.java.isAssignableFrom(it)
+                && it != KtElement::class.java
+                && it != KtElementImplStub::class.java
+                && it != KtPureElement::class.java
     }
+    if (commonSuperClasses.isNotEmpty()) {
+        log.trace { "Common super classes for ${one::class.simpleName} and ${other::class.simpleName} = $commonSuperClasses" }
+    }
+    return commonSuperClasses.isNotEmpty()
 }
 
 fun <T, U> Iterable<T>.firstNotNull(fn: (T) -> U?) = asSequence().firstNotNull(fn)

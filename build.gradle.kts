@@ -117,8 +117,8 @@ kotlin {
         }
         getByName("jvmTest") {
             dependencies {
-                //                implementation(kotlin("test"))
-//                implementation(kotlin("test-junit"))
+                implementation(kotlin("test"))
+                implementation(kotlin("test-junit"))
             }
         }
         getByName("jsMain") {

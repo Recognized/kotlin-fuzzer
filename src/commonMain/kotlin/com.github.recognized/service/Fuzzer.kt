@@ -8,7 +8,11 @@ interface Fuzzer : RPCService {
 
     suspend fun stat(): Statistics
 
+    suspend fun togglePause()
+
     suspend fun start()
+
+    suspend fun stop()
 
     suspend fun generation(offset: Int, count: Int, sortBy: SortOrder): List<Snippet>
 }
@@ -19,9 +23,15 @@ enum class SortOrder {
 }
 
 @Serializable
+enum class State {
+    Stop, Start, Paused
+}
+
+@Serializable
 data class Statistics(
-    val uptime: Long,
-    val iterations: Long,
+    val uptime: Int,
+    val run: State,
+    val iterations: Int,
     val compileSuccessRate: Double,
     val state: String
 )
@@ -30,7 +40,7 @@ data class Statistics(
 data class Snippet(
     val id: String,
     val metrics: Metrics,
-    val value: Long
+    val value: Int
 )
 
 @Serializable
@@ -40,8 +50,8 @@ data class Metrics(
     val symbols: Int,
     val psiElements: Int
 ) {
-    fun value(kernel: Kernel): Long {
-        return (kernel.fn(symbols.toDouble()) * (jitTime * 10000.0 / psiElements)).toLong()
+    fun value(kernel: Kernel): Int {
+        return (kernel.fn(symbols.toDouble()) * (jitTime * 10000.0 / psiElements)).toInt()
     }
 }
 

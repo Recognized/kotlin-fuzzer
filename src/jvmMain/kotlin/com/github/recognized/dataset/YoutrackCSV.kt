@@ -3,6 +3,8 @@ package com.github.recognized.dataset
 import com.github.recognized.CompileTarget
 import com.github.recognized.compile.PsiFacade
 import com.github.recognized.compile.hasErrorBelow
+import com.github.recognized.kodein
+import com.github.recognized.metrics.FitnessFunction
 import com.github.recognized.runtime.disposing
 import com.github.recognized.runtime.logger
 import kotlinx.serialization.Serializable
@@ -61,9 +63,11 @@ fun splitCanCompile(data: Collection<String>): Map<Boolean, List<String>> {
         val jvmFacade = PsiFacade(it, CompileTarget.Jvm)
         val jsFacade = PsiFacade(it, CompileTarget.Jvm)
         var index = 0
+        val fn by kodein.instance<FitnessFunction>()
         data.groupBy {
             log.info { "Progress: ${index++}/${data.size}" }
-            jvmFacade.getPsi(it)?.hasErrorBelow() == false || jsFacade.getPsi(it)?.hasErrorBelow() == false
+            (jvmFacade.getPsi(it)?.hasErrorBelow() == false || jsFacade.getPsi(it)?.hasErrorBelow() == false)
+                    && fn.score(it)?.compiled == true
         }
     }
 }
@@ -89,7 +93,7 @@ fun loadData(dataDir: Path): CodeCount {
 class YouTrackCorpus(facade: PsiFacade) : Corpus {
     private val data by lazy {
         loadData(Paths.get("data", "youtrack")).codes.withIndex()
-            .map { IdSample("YT-${it.index}", LazySample(facade, it.value.code)) }
+            .map { Sample(null, "YT-${it.index}", it.value.code) }
     }
 
     override fun samples(): List<Sample> = data

@@ -34,7 +34,7 @@ fun main() {
 class KotlinTestsCorpus(facade: PsiFacade) : Corpus {
     private val data by lazy {
         loadData(Paths.get("data", "kotlin-tests")).codes.withIndex()
-            .map { IdSample("KT-tests-${it.index}", LazySample(facade, it.value.code)) }
+            .map { Sample(null, "KT-tests-${it.index}", it.value.code) }
     }
 
     override fun samples(): List<Sample> = data
