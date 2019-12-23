@@ -13,15 +13,10 @@ interface Mutation {
     fun mutate(corpus: List<Sample>, sample: Sample): String?
 }
 
-class AllMutations(val all: List<Mutation>)
-
 fun Kodein.MainBuilder.mutations() {
     bind() from setBinding<Mutation>()
     bind<Chooser<PsiElement, PsiElement>>() with singleton { SimpleSubtreeChooser(0.2) }
 
     bind<Mutation>().inSet() with singleton { Replace(instance(), instance()) }
     bind<Mutation>().inSet() with singleton { Add(instance(), instance(), instance()) }
-
-    bind() from singleton { AllMutations(instance<Set<Mutation>>().toList()) }
-
 }

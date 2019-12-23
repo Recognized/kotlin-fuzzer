@@ -6,9 +6,9 @@ import com.intellij.psi.PsiElement
 import kotlin.math.exp
 import kotlin.random.Random
 
-class SimpleSubtreeChooser(val lambda: Double) : Chooser<PsiElement, PsiElement> {
+class SimpleSubtreeChooser(val lambda: Double) : Chooser<PsiElement, PsiElement>() {
 
-    override fun choose(random: Random, x: PsiElement, constraint: (PsiElement) -> Boolean): PsiElement? {
+    override fun chooseImpl(random: Random, x: PsiElement, constraint: (PsiElement) -> Boolean): PsiElement? {
         return x.asSequence().toList().shuffled().firstNotNull { element ->
             val psiSize by lazy { element.asSequence().count() }
             val chance by lazy { random.nextDouble() > 1 - exp(-lambda * psiSize) }

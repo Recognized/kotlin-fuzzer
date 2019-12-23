@@ -10,26 +10,26 @@ fun logger(name: String): com.github.recognized.runtime.Logger {
 
 class Logger(private val parent: Logger) {
 
-    fun info(msg: () -> Any) {
+    fun info(msg: () -> Any?) {
         if (parent.isInfoEnabled) {
             parent.info(msg().toString())
         }
     }
 
-    fun debug(msg: () -> Any) {
+    fun debug(msg: () -> Any?) {
         if (parent.isDebugEnabled) {
             parent.debug(msg().toString())
         }
     }
 
-    fun error(msg: () -> Any): Nothing? {
+    fun error(msg: () -> Any?): Nothing? {
         if (parent.isErrorEnabled) {
             parent.error(msg().toString())
         }
         return null
     }
 
-    fun trace(msg: () -> Any) {
+    fun trace(msg: () -> Any?) {
         if (parent.isTraceEnabled) {
             parent.trace(msg().toString())
         }

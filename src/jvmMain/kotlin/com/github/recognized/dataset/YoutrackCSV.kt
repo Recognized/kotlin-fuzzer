@@ -67,7 +67,7 @@ fun splitCanCompile(data: Collection<String>): Map<Boolean, List<String>> {
         data.groupBy {
             log.info { "Progress: ${index++}/${data.size}" }
             (jvmFacade.getPsi(it)?.hasErrorBelow() == false || jsFacade.getPsi(it)?.hasErrorBelow() == false)
-                    && fn.score(it)?.compiled == true
+                    && fn.score(it){}?.compiled == true
         }
     }
 }

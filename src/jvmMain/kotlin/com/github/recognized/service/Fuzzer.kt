@@ -11,8 +11,8 @@ class FuzzerImpl : Fuzzer {
         return Server.stat()
     }
 
-    override suspend fun togglePause() {
-        Server.togglePause()
+    override suspend fun pause() {
+        Server.pause()
     }
 
     override suspend fun stop() {

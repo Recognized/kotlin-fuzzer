@@ -16,6 +16,10 @@ class FuzzerProxy(val client: HttpClient) : com.github.recognized.service.Fuzzer
         }
         return parse(com.github.recognized.service.Snippet.serializer().list, result___)
     }
+    override suspend fun pause(): kotlin.Unit {
+        val result___ = client.get<String>(server + "/api/Fuzzer/pause") {
+        }
+    }
     override suspend fun start(): kotlin.Unit {
         val result___ = client.get<String>(server + "/api/Fuzzer/start") {
         }
@@ -27,10 +31,6 @@ class FuzzerProxy(val client: HttpClient) : com.github.recognized.service.Fuzzer
     }
     override suspend fun stop(): kotlin.Unit {
         val result___ = client.get<String>(server + "/api/Fuzzer/stop") {
-        }
-    }
-    override suspend fun togglePause(): kotlin.Unit {
-        val result___ = client.get<String>(server + "/api/Fuzzer/togglePause") {
         }
     }
 }

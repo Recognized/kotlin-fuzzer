@@ -1,12 +1,11 @@
+package com.github.recognized.test
+
 import com.github.recognized.dataset.AllCorpuses
 import com.github.recognized.dataset.Sample
 import com.github.recognized.kodein
 import com.github.recognized.mutation.Add
 import com.github.recognized.mutation.Mutation
 import com.github.recognized.mutation.Replace
-import com.intellij.openapi.extensions.ExtensionPoint
-import com.intellij.openapi.extensions.Extensions
-import com.intellij.psi.impl.source.tree.TreeCopyHandler
 import org.junit.Test
 import org.kodein.di.generic.instance
 import kotlin.reflect.KClass

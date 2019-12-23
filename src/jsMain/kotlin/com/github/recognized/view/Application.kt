@@ -14,8 +14,10 @@ import contrib.ringui.ringButton
 import kotlinx.coroutines.*
 import kotlinx.css.*
 import kotlinx.css.properties.LineHeight
-import kotlinx.css.properties.Time
-import react.*
+import react.RBuilder
+import react.RComponent
+import react.RProps
+import react.RState
 import react.dom.*
 import styled.*
 import kotlin.coroutines.CoroutineContext
@@ -127,15 +129,15 @@ class ApplicationComponent : RComponent<ApplicationProps, Timestamp>(), Coroutin
                             launch {
                                 val fz = App.client.Fuzzer
                                 when (st.stat.run) {
-                                    State.Paused, State.Start -> fz.togglePause()
-                                    State.Stop -> fz.start()
+                                    State.Start -> fz.pause()
+                                    State.Pause, State.Stop -> fz.start()
                                 }
                             }
                         }
                     }
 
                     +when (st.stat.run) {
-                        State.Paused -> "Unpause"
+                        State.Pause -> "Unpause"
                         State.Stop -> "Start"
                         State.Start -> "Pause"
                     }
@@ -151,7 +153,7 @@ class ApplicationComponent : RComponent<ApplicationProps, Timestamp>(), Coroutin
                             }
                             td {
 
-                                +"State"
+                                +"States"
                             }
                             td {
                                 +"Compile rate"
@@ -200,7 +202,10 @@ class ApplicationComponent : RComponent<ApplicationProps, Timestamp>(), Coroutin
                             +"Score"
                         }
                         td {
-                            +"Jit time, ms"
+                            +"Analyze, ms"
+                        }
+                        td {
+                            +"Generate, ms"
                         }
                         td {
                             +"Psi count"
@@ -246,7 +251,10 @@ class ApplicationComponent : RComponent<ApplicationProps, Timestamp>(), Coroutin
                 +sample.value.toString()
             }
             td {
-                +sample.metrics.jitTime.toString()
+                +sample.metrics.analyze.toString()
+            }
+            td {
+                +sample.metrics.generate.toString()
             }
             td {
                 +sample.metrics.psiElements.toString()

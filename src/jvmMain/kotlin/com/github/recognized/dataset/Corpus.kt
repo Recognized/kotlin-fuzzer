@@ -3,6 +3,7 @@ package com.github.recognized.dataset
 import com.github.recognized.compile.PsiFacade
 import com.github.recognized.kodein
 import com.github.recognized.metrics.Score
+import com.github.recognized.service.Kernel
 import com.github.recognized.service.Metrics
 import kotlinx.serialization.Serializable
 import org.jetbrains.kotlin.psi.KtElement
@@ -31,4 +32,9 @@ class AllCorpuses(private val data: Set<Corpus>) : Corpus {
     private val allSamples by lazy { data.sortedBy { it::class.simpleName }.flatMap { it.samples() } }
 
     override fun samples(): List<Sample> = allSamples
+}
+
+fun sampleComparator(kernel: Kernel): Comparator<Sample> {
+    val cmp: Comparator<Sample> = compareBy { it.metrics?.value(kernel) ?: -1 }
+    return cmp.reversed()
 }

@@ -25,36 +25,9 @@ repositories {
 
 apply("plugin" to "com.github.node-gradle.node")
 
-
 val kotlin_version = "1.3.60"
 val ktor_version = "1.1.4"
 val logback_version = "1.2.3"
-
-val configureNodePlugin: Project.() -> Unit = {
-
-    node {
-        // Version of node to use
-        version = "10.15.3"
-
-        // Base URL for fetching node distributions (change if you have a mirror)
-        distBaseUrl = "https://nodejs.org/dist"
-
-        // If true, it will download node using above parameters.
-        // If false, it will try to use globally installed node.
-        download = true
-
-        // Set the work directory for unpacking node
-        workDir = file("${projectDir}/build/nodejs")
-
-        // Set the work directory for NPM
-        npmWorkDir = file("${projectDir}/build/npm")
-
-        // Set the work directory where node_modules should be located
-        nodeModulesDir = file("${projectDir}/build")
-    }
-}
-
-ext["configureNodePlugin"] = configureNodePlugin
 
 kotlin {
     jvm {
@@ -110,8 +83,6 @@ kotlin {
                 implementation("org.slf4j:slf4j-simple:1.7.29")
                 implementation("org.apache.commons:commons-csv:1.1")
                 implementation("org.kodein.di:kodein-di-generic-jvm:6.4.1")
-//                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.3.2")
-//              implementation group: "com.android.tools.external.com-intellij", name: "kotlin-compiler", version: "26.5.0"
                 implementation("org.jetbrains.kotlin:kotlin-compiler:$kotlin_version")
             }
         }
@@ -119,6 +90,7 @@ kotlin {
             dependencies {
                 implementation(kotlin("test"))
                 implementation(kotlin("test-junit"))
+                implementation("org.knowm.xchart:xchart:3.5.4")
             }
         }
         getByName("jsMain") {
@@ -179,45 +151,13 @@ kotlinFrontend {
         this as org.jetbrains.kotlin.gradle.frontend.webpack.WebPackExtension
         port = 8080
         bundleName = "main"
-        proxyUrl = "http://0.0.0.0:8081"
         sourceMapEnabled = true
         mode = "development"
-        mode = "production"
     }
 }
 
-println("CONFIG SSS")
 project.afterEvaluate {
-    configurations.all {
-        try {
-            println(name)
-        } catch (ex: Throwable) {
-            //
-        }
-    }
-//    println(configurations.getByName("jvmMainApi").toList())
-    val jars = configurations.getByName("jvmCompileClasspath").toList()
-    val jars2 = configurations.getByName("jvmRuntimeClasspath").toList()
-    val jars3 = configurations.getByName("compileClasspath").toList()
-    val jars4 = configurations.getByName("runtimeClasspath").toList()
-    val filtered = (jars + jars2 + jars3 + jars4).filterNot {
-        "core-1.1.1.jar" in it.name
-                || "common-1.3.2" in it.name
-//                || "coroutines-io-0.1.16" in it.name
-                || "coroutines-core" in it.name
-//                || "coroutines" in it.name
-//        false
-    }
-    filtered.forEach {
-        println(it)
-    }
-    val deps = files(*filtered.toSet().toTypedArray())
-    val runMain by tasks.creating(JavaExec::class) {
-        dependsOn(tasks.getByName("jvmJar"))
-        classpath = deps + files("$buildDir/classes/kotlin/jvm/main")
-
-        main = "com.github.recognized.Main"
+    tasks.register("rebuildFrontend") {
+        dependsOn(tasks.getByName("webpack-bundle"), tasks.getByName("compileKotlinJs"))
     }
 }
-
-

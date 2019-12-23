@@ -24,7 +24,7 @@ fun Kodein.MainBuilder.mainKodein() {
     bind<PsiFacade>() with singleton { PsiFacade(Server, instance()) }
     bind<Random>() with singleton { Random(1999) }
     bind<List<String>>(CLASSPATH) with singleton { setupClasspath(instance()) }
-    constant(KOTLIN_HOME) with "/home/recog/Apps/Idea.2019.1.3/idea-IU-191.7479.19/plugins/Kotlin/"
+    constant(KOTLIN_HOME) with "/home/recog/.local/share/JetBrains/Toolbox/apps/IDEA-U/ch-1/193.5662.31/plugins/Kotlin/"
     bind<FitnessFunction>() with singleton {
         getCompileTimeFitnessFunction(
             instance(),

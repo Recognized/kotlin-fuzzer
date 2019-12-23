@@ -19,12 +19,12 @@ import kotlin.reflect.full.declaredMembers
 import kotlin.reflect.jvm.isAccessible
 
 interface FitnessFunction {
-    fun score(code: String): Score?
+    fun score(code: String, statReporter: (String) -> Unit): Score
 }
 
 data class Score(
-    val jitTime: Int,
-    val javaClassFind: Int?,
+    val analyze: Int,
+    val generate: Int,
     val compiled: Boolean
 )
 
@@ -34,29 +34,29 @@ class CompileTimeFitnessFunction<T : CommonCompilerArguments>(
     private val compiler: CLICompiler<T>, private val arguments: () -> T
 ) : FitnessFunction {
     private val messageCollector = SimpleMessageCollector()
-    private var previousAbsoluteJitMark = 0
 
-    override fun score(code: String): Score? {
-        val exitCode = try {
-            doCompile(code)
-        } catch (ex: Throwable) {
-            log.error(ex)
-            ExitCode.INTERNAL_ERROR
-        }
-        log.info { "exit code: $exitCode" }
+    override fun score(code: String, statReporter: (String) -> Unit): Score {
+        val exitCode = doCompile(code)
+        log.trace { "exit code: $exitCode" }
+        reportErrors(statReporter)
         return makeScore(exitCode)
     }
 
-    private fun makeScore(exitCode: ExitCode): Score? {
-        val jitMark = getJitTimeMark() ?: return log.error { "Cannot find Jit time perf log" }
-        val relativeMark = relativizeAbsoluteJitMark(jitMark)
+    private fun makeScore(exitCode: ExitCode): Score {
+        val analyze = getAnalyzeTime() ?: error("Analyze time not found")
+        val generate = getGenerateTime() ?: error("Generate time not found")
 
-        val javaStat = getJavaClassStat()
         return Score(
-            relativeMark,
-            javaStat,
+            analyze,
+            generate,
             exitCode == ExitCode.OK && !messageCollector.hasErrors()
         )
+    }
+
+    private fun reportErrors(statReporter: (String) -> Unit) {
+        messageCollector.errors().forEach {
+            statReporter(it)
+        }
     }
 
     private fun doCompile(code: String): ExitCode {
@@ -66,44 +66,30 @@ class CompileTimeFitnessFunction<T : CommonCompilerArguments>(
             val args = arguments()
             compiler.parseArguments(arrayOf("${TempFile(code, it).dir.toAbsolutePath()}"), args)
             val exitCode = compiler.exec(messageCollector, Services.EMPTY, args)
-            messageCollector.others()
-            reportErrors()
             reportOthers()
             return exitCode
         }
     }
 
-    private fun reportErrors() {
-        messageCollector.errors().forEach {
-            log.error { it }
-        }
-    }
-
     private fun reportOthers() {
         messageCollector.others().forEach {
-            log.info { it }
+            log.trace { it }
         }
     }
 
-    private fun relativizeAbsoluteJitMark(absoluteMark: Int): Int {
-        return (absoluteMark - previousAbsoluteJitMark).also {
-            previousAbsoluteJitMark = absoluteMark
-        }
+    private fun getAnalyzeTime(): Int? {
+        return perf().find(ANALYZE_MS)?.groupValues?.getOrNull(1)?.toIntOrNull()
     }
 
-    private fun getJitTimeMark(): Int? {
-        return perf().find(JIT_TIME_MARK)?.groupValues?.getOrNull(1)?.toIntOrNull()
-    }
-
-    private fun getJavaClassStat(): Int? {
-        return perf().find(JAVA_CLASS_FIND_STAT)?.groupValues?.getOrNull(1)?.toIntOrNull()
+    private fun getGenerateTime(): Int? {
+        return perf().find(GENERATE_MS)?.groupValues?.getOrNull(1)?.toIntOrNull()
     }
 
     private fun perf(): List<String> = messageCollector.others().filter { it.startsWith("PERF") }
 
     companion object {
-        private val JIT_TIME_MARK = "JIT time is ([0-9]+) ms".toRegex()
-        private val JAVA_CLASS_FIND_STAT = "Java class performed ([0-9]+) times".toRegex()
+        val ANALYZE_MS = "ANALYZE: .*?in ([0-9]+) ms".toRegex()
+        val GENERATE_MS = "GENERATE: .*?in ([0-9]+) ms".toRegex()
     }
 }
 
