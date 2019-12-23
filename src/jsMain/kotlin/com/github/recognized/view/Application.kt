@@ -202,14 +202,10 @@ class ApplicationComponent : RComponent<ApplicationProps, Timestamp>(), Coroutin
                                 +"Uptime"
                             }
                             td {
-
-                                +"States"
+                                +"State"
                             }
                             td {
                                 +"Compile rate"
-                            }
-                            td {
-                                +"Iteration"
                             }
                         }
                     }
@@ -224,9 +220,6 @@ class ApplicationComponent : RComponent<ApplicationProps, Timestamp>(), Coroutin
                             }
                             td {
                                 +"${(st.stat.compileSuccessRate * 100).toInt()}%"
-                            }
-                            td {
-                                +st.stat.iterations
                             }
                         }
                     }

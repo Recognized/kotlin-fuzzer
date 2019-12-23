@@ -2,6 +2,7 @@
 
 package com.github.recognized
 
+import com.github.recognized.mutation.showChain
 import com.github.recognized.rpc.serve
 import com.github.recognized.runtime.logger
 import com.github.recognized.service.Fuzzer
@@ -59,12 +60,12 @@ fun main() {
                 val id = context.request.queryParameters["id"]
                 val sample = Server.generation().find {
                     it.id == id
-                }?.tree?.text
+                }
                 if (sample == null) {
                     context.respond(HttpStatusCode.NotFound)
                 } else {
                     context.respondText {
-                        sample
+                        showChain(sample)
                     }
                 }
             }

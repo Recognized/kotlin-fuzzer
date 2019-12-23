@@ -6,6 +6,7 @@ import com.github.recognized.dataset.Sample
 import com.github.recognized.dataset.sampleComparator
 import com.github.recognized.metrics.FitnessFunction
 import com.github.recognized.mutation.Mutation
+import com.github.recognized.mutation.MutationInfo
 import com.github.recognized.mutation.asSequence
 import com.github.recognized.random.Chooser
 import com.github.recognized.runtime.Property
@@ -71,8 +72,9 @@ data class Run(
                 generation = generation.sortedWith(cmp)
 
                 checkCancelled()
+                stat.compilations++
 
-                val code = try {
+                val info = try {
                     mutate()
                 } catch (ex: Throwable) {
                     compilationError(ex.message)
@@ -82,8 +84,7 @@ data class Run(
                 checkCancelled()
 
                 val metrics = try {
-                    stat.compilations++
-                    score(code)
+                    score(info.result)
                 } catch (ex: Throwable) {
                     continue
                 }
@@ -94,7 +95,9 @@ data class Run(
 
                 checkCancelled()
 
-                generation += Sample(metrics, nextId(), code)
+                val mutated = Sample(metrics, nextId(), info.result)
+                mutated.parent = info
+                generation += mutated
 
                 if (generation.size > generationSize + generationOverGrow) {
                     filter()
@@ -119,7 +122,7 @@ data class Run(
         }
     }
 
-    private fun mutate(): String {
+    private fun mutate(): MutationInfo {
         return state("Mutation #${stat.mutationsCount++}") {
             val mutation = mutationChooser.choose(random, mutations)!!
             val sample = sampleChooser.choose(random, generation)!!
@@ -127,7 +130,7 @@ data class Run(
             if (code == sample.tree?.text) {
                 error("Nothing changed after mutation $mutation")
             }
-            code
+            MutationInfo(sample, mutation, code)
         }
     }
 

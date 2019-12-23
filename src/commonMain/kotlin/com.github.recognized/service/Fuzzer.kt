@@ -54,6 +54,10 @@ data class Metrics(
     fun value(kernel: Kernel): Int {
         return (kernel.fn(symbols.toDouble()) * ((analyze * generate) * 10.0 / psiElements)).toInt()
     }
+
+    fun show(kernel: Kernel): String {
+        return toString() + ", score: ${value(kernel)}"
+    }
 }
 
 class Kernel(val name: String, val fn: (Double) -> Double)

@@ -2,10 +2,11 @@ package com.github.recognized.dataset
 
 import com.github.recognized.compile.PsiFacade
 import com.github.recognized.kodein
-import com.github.recognized.metrics.Score
+import com.github.recognized.mutation.MutationInfo
 import com.github.recognized.service.Kernel
 import com.github.recognized.service.Metrics
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import org.jetbrains.kotlin.psi.KtElement
 import org.kodein.di.Kodein
 import org.kodein.di.generic.*
@@ -17,7 +18,8 @@ interface Corpus {
 @Serializable
 data class Sample(val metrics: Metrics?, val id: String?, val file: String) {
     private val facade by kodein.instance<PsiFacade>()
-    var parent: Sample? = null
+    @Transient
+    var parent: MutationInfo? = null
 
     val tree: KtElement? get() = facade.getPsi(file)
 }
