@@ -114,8 +114,8 @@ object Server : CoroutineScope, Disposable by Disposer.newDisposable() {
             }
             val tree = it.tree
             if (it.metrics == null && tree != null) {
-                val score = fitness.score(tree.text) {}
-                if (score != null) {
+                try {
+                    val score = fitness.score(tree.text) {}
                     val metrics = Metrics(
                         analyze = score.analyze,
                         generate = score.generate,
@@ -124,7 +124,7 @@ object Server : CoroutineScope, Disposable by Disposer.newDisposable() {
                         psiElements = tree.asSequence().count()
                     )
                     it.copy(metrics = metrics)
-                } else {
+                } catch (ex: Throwable) {
                     null
                 }
             } else {

@@ -24,7 +24,13 @@ import kotlin.coroutines.CoroutineContext
 
 object ApplicationStyles : StyleSheet("ApplicationStyles", isStatic = true)
 
-data class ApplicationState(val stat: Statistics, val snippets: List<Snippet>)
+data class ApplicationState(
+    val stat: Statistics,
+    val snippets: List<Snippet>,
+    val order: SortOrder = SortOrder.Score,
+    val showOnlyMutated: Boolean = false
+)
+
 class ApplicationProps : RProps
 
 class Timestamp(val value: Int) : RState
@@ -43,6 +49,15 @@ class ApplicationComponent : RComponent<ApplicationProps, Timestamp>(), Coroutin
         })
     }
 
+    private fun updateAndReload(action: () -> Unit) {
+        update {
+            action()
+            launch {
+                reloadList()
+            }
+        }
+    }
+
     override fun componentDidMount() {
         updateLoop()
         genLoop()
@@ -55,7 +70,6 @@ class ApplicationComponent : RComponent<ApplicationProps, Timestamp>(), Coroutin
     override val coroutineContext: CoroutineContext = Job()
 
     private var sampleSizes = 20
-    private var order = SortOrder.Score
 
     private fun updateLoop() {
         loop(1_000L) {
@@ -66,10 +80,17 @@ class ApplicationComponent : RComponent<ApplicationProps, Timestamp>(), Coroutin
         }
     }
 
+    private suspend fun reloadList() {
+        val snippets = App.client.Fuzzer.generation(0, sampleSizes, st.order, st.showOnlyMutated)
+        update {
+            st = st.copy(snippets = snippets)
+        }
+    }
+
     private fun loop(delay: Long, action: suspend () -> Unit) {
         launch {
             while (true) {
-                val snippets = try {
+                try {
                     action()
                 } catch (ex: Throwable) {
                     console.error(ex)
@@ -82,10 +103,7 @@ class ApplicationComponent : RComponent<ApplicationProps, Timestamp>(), Coroutin
 
     private fun genLoop() {
         loop(10_000L) {
-            val snippets = App.client.Fuzzer.generation(0, sampleSizes, order)
-            update {
-                st = st.copy(snippets = snippets)
-            }
+            reloadList()
         }
     }
 
@@ -105,6 +123,38 @@ class ApplicationComponent : RComponent<ApplicationProps, Timestamp>(), Coroutin
 
                 spring()
 
+                ringButton {
+                    attrs {
+                        onMouseDown = {
+                            launch {
+                                reloadList()
+                            }
+                        }
+                        primary = true
+                    }
+
+                    +"Refresh"
+                }
+
+                gap(8.px)
+
+                ringButton {
+                    attrs {
+                        onMouseDown = {
+                            updateAndReload {
+                                st = st.copy(showOnlyMutated = !st.showOnlyMutated)
+                            }
+                        }
+                    }
+
+                    if (st.showOnlyMutated) {
+                        +"Only mutated"
+                    } else {
+                        +"All samples"
+                    }
+                }
+
+                gap(8.px)
 
                 if (st.stat.run != State.Stop) {
                     ringButton {
@@ -196,22 +246,22 @@ class ApplicationComponent : RComponent<ApplicationProps, Timestamp>(), Coroutin
                 thead {
                     tr {
                         td {
-                            +"Snippet"
+                            orderBy("Snippet", SortOrder.Name)
                         }
                         td {
-                            +"Score"
+                            orderBy("Score", SortOrder.Score)
                         }
                         td {
-                            +"Analyze, ms"
+                            orderBy("Analyze, ms", SortOrder.Analyze)
                         }
                         td {
-                            +"Generate, ms"
+                            orderBy("Generate, ms", SortOrder.Generate)
                         }
                         td {
-                            +"Psi count"
+                            orderBy("Psi count", SortOrder.PsiElement)
                         }
                         td {
-                            +"Text length"
+                            orderBy("Text length", SortOrder.Symbols)
                         }
                     }
                 }
@@ -225,13 +275,30 @@ class ApplicationComponent : RComponent<ApplicationProps, Timestamp>(), Coroutin
             ringButton {
                 attrs {
                     onMouseDown = {
-                        sampleSizes += 20
+                        updateAndReload {
+                            sampleSizes += 20
+                        }
                     }
                     text = true
                 }
 
                 +"Load more"
             }
+        }
+    }
+
+    private fun RBuilder.orderBy(name: String, order: SortOrder) {
+        ringButton {
+            attrs {
+                onMouseDown = {
+                    updateAndReload {
+                        st = st.copy(order = order)
+                    }
+                }
+                active = order != st.order
+            }
+
+            +name
         }
     }
 

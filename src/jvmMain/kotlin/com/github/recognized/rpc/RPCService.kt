@@ -87,6 +87,7 @@ object SerializationRegistry {
         register(Double::class, Double.serializer())
         register(String::class, String.serializer())
         register(Long::class, Long.serializer())
+        register(Boolean::class, Boolean.serializer())
     }
 
     @Suppress("unchecked_cast")

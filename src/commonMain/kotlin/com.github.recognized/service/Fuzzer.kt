@@ -14,12 +14,12 @@ interface Fuzzer : RPCService {
 
     suspend fun stop()
 
-    suspend fun generation(offset: Int, count: Int, sortBy: SortOrder): List<Snippet>
+    suspend fun generation(offset: Int, count: Int, sortBy: SortOrder, onlyMutated: Boolean): List<Snippet>
 }
 
 @Serializable
 enum class SortOrder {
-    Score
+    Score, Analyze, Generate, PsiElement, Symbols, Name
 }
 
 @Serializable

@@ -17,6 +17,7 @@ interface Corpus {
 @Serializable
 data class Sample(val metrics: Metrics?, val id: String?, val file: String) {
     private val facade by kodein.instance<PsiFacade>()
+    var parent: Sample? = null
 
     val tree: KtElement? get() = facade.getPsi(file)
 }
