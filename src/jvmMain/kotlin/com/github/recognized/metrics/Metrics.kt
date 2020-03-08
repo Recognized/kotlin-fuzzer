@@ -6,6 +6,7 @@ import com.github.recognized.mutation.firstNotNull
 import com.github.recognized.runtime.TempFile
 import com.github.recognized.runtime.disposing
 import com.github.recognized.runtime.logger
+import com.github.recognized.service.IntWithDispersion
 import org.jetbrains.kotlin.cli.common.CLICompiler
 import org.jetbrains.kotlin.cli.common.CommonCompilerPerformanceManager
 import org.jetbrains.kotlin.cli.common.ExitCode
@@ -18,15 +19,22 @@ import org.jetbrains.kotlin.utils.addToStdlib.cast
 import kotlin.reflect.full.declaredMembers
 import kotlin.reflect.jvm.isAccessible
 
+@Suppress("NonAsciiCharacters")
+infix fun Int.`±`(other: Int): IntWithDispersion = IntWithDispersion(this, other)
+
 interface FitnessFunction {
     fun score(code: String, statReporter: (String) -> Unit): Score
 }
 
 data class Score(
-    val analyze: Int,
-    val generate: Int,
+    val analyze: IntWithDispersion,
+    val generate: IntWithDispersion,
     val compiled: Boolean
-)
+) {
+    override fun toString(): String {
+        return "Score(compiled = $compiled, analyze = $analyze, generate = $generate)"
+    }
+}
 
 private val log = logger("Metrics")
 
@@ -47,8 +55,8 @@ class CompileTimeFitnessFunction<T : CommonCompilerArguments>(
         val generate = getGenerateTime() ?: error("Generate time not found")
 
         return Score(
-            analyze,
-            generate,
+            analyze `±` 0,
+            generate `±` 0,
             exitCode == ExitCode.OK && !messageCollector.hasErrors()
         )
     }

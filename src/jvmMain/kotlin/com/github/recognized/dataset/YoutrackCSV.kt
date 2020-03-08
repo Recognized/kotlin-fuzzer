@@ -67,25 +67,28 @@ fun splitCanCompile(data: Collection<String>): Map<Boolean, List<String>> {
         data.groupBy {
             log.info { "Progress: ${index++}/${data.size}" }
             (jvmFacade.getPsi(it)?.hasErrorBelow() == false || jsFacade.getPsi(it)?.hasErrorBelow() == false)
-                    && fn.score(it){}?.compiled == true
+                    && fn.score(it) {}?.compiled == true
         }
     }
 }
 
-fun saveFilteredData(data: Map<Boolean, List<String>>, dataDir: Path) {
+fun saveFilteredData(data: Map<Boolean, List<String>>, dataDir: Path, suffix: String = "") {
     val failed = data[false].orEmpty().map(::Code).let { CodeCount(it.size, false, it) }
     val succeeded = data[true].orEmpty().map(::Code).let { CodeCount(it.size, true, it) }
     val json = Json(JsonConfiguration.Stable.copy(prettyPrint = true))
-    Files.newBufferedWriter(dataDir.resolve("failed.json")).use {
+    Files.newBufferedWriter(dataDir.resolve("failed$suffix.json")).use {
         it.write(json.stringify(CodeCount.serializer(), failed))
     }
-    Files.newBufferedWriter(dataDir.resolve("succeeded.json")).use {
+    Files.newBufferedWriter(dataDir.resolve("succeeded$suffix.json")).use {
         it.write(json.stringify(CodeCount.serializer(), succeeded))
     }
 }
 
-fun loadData(dataDir: Path): CodeCount {
-    return Files.newBufferedReader(dataDir.resolve("succeeded.json")).use {
+const val YOUTRACK_DIR = "data/youtrack"
+const val KOTLIN_TESTS_DIR = "data/kotlin-tests"
+
+fun loadData(dataDir: Path, suffix: String = ""): CodeCount {
+    return Files.newBufferedReader(dataDir.resolve("succeeded$suffix.json")).use {
         Json(JsonConfiguration.Stable).parse(CodeCount.serializer(), it.readText())
     }
 }

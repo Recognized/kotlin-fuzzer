@@ -2,6 +2,7 @@ package com.github.recognized.mutation
 
 import com.github.recognized.dataset.Sample
 import com.github.recognized.random.Chooser
+import com.github.recognized.random.shuffledSeq
 import com.github.recognized.runtime.commonSuperClass
 import com.github.recognized.runtime.logger
 import com.intellij.psi.PsiElement
@@ -18,11 +19,11 @@ class Replace(val random: Random, val subtreeChooser: Chooser<PsiElement, PsiEle
     override fun mutate(corpus: List<Sample>, sample: Sample): String? {
         val tree = sample.tree ?: error("Psi construction failed")
         val forReplace = subtreeChooser.choose(random, tree)!!
-        val replacement = corpus.shuffled(random).firstNotNull {
+        val replacement = corpus.shuffledSeq(random).firstNotNull {
             val breed = it.tree ?: return@firstNotNull null
             subtreeChooser.choose(random, breed) {
                 swappable(it, forReplace)
-            }
+            }?.takeIf { it.parent != null }
         } as KtElement? ?: return null
         log.trace { "Replacing ${forReplace::class.simpleName}{${forReplace.text}} with ${replacement::class.simpleName}{${replacement.text}}" }
         forReplace.astReplace(replacement)

@@ -5,6 +5,8 @@ import com.github.recognized.dataset.AllCorpuses
 import com.github.recognized.dataset.Sample
 import com.github.recognized.dataset.sampleComparator
 import com.github.recognized.metrics.FitnessFunction
+import com.github.recognized.metrics.Score
+import com.github.recognized.metrics.`±`
 import com.github.recognized.mutation.Mutation
 import com.github.recognized.mutation.MutationInfo
 import com.github.recognized.mutation.asSequence
@@ -18,6 +20,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import org.kodein.di.generic.instance
 import kotlin.coroutines.coroutineContext
+import kotlin.math.pow
 import kotlin.random.Random
 
 data class RunStat(
@@ -40,6 +43,7 @@ data class Run(
     val sampleChooser: Chooser<Iterable<Sample>, Sample>,
     val generationSize: Int,
     val generationOverGrow: Int,
+    val repeatCount: Int = 5,
     val loadInitial: suspend () -> List<Sample> = { emptyList() }
 ) {
     private val mutations by kodein.instance<Set<Mutation>>()
@@ -135,9 +139,7 @@ data class Run(
     }
 
     private fun score(code: String): Metrics {
-        val score = fitness.score(code) {
-            compilationError(it)
-        }
+        val score = fitness.scoreAvg(code, repeatCount, this::compilationError)
         val psiCount = facade.getPsi(code)?.asSequence()?.count() ?: error("Could not parse code after mutation")
         return Metrics(
             analyze = score.analyze,
@@ -160,5 +162,27 @@ data class Run(
     private inline fun <T> state(name: String, fn: () -> T): T {
         stat.state = name
         return fn()
+    }
+}
+
+fun FitnessFunction.scoreAvg(
+    code: String,
+    repeatCount: Int = 5,
+    statReporter: (String) -> Unit = { error(it) }
+): Score {
+    return (1..repeatCount).map {
+        score(code, statReporter)
+    }.let {
+        val analyzeAvg = it.map { it.analyze.value }.average().toInt()
+        val generateAvg = it.map { it.generate.value }.average().toInt()
+        Score(
+            analyze = analyzeAvg `±` (it.sumByDouble {
+                (it.analyze.value - analyzeAvg).toDouble().pow(2)
+            } / it.size).pow(0.5).toInt(),
+            generate = generateAvg `±` (it.sumByDouble {
+                (it.generate.value - generateAvg).toDouble().pow(2)
+            } / it.size).pow(0.5).toInt(),
+            compiled = it.all { it.compiled }
+        )
     }
 }

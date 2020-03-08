@@ -115,7 +115,7 @@ object Server : CoroutineScope, Disposable by Disposer.newDisposable() {
             val tree = it.tree
             if (it.metrics == null && tree != null) {
                 try {
-                    val score = fitness.score(tree.text) {}
+                    val score = fitness.scoreAvg(tree.text, 10)
                     val metrics = Metrics(
                         analyze = score.analyze,
                         generate = score.generate,

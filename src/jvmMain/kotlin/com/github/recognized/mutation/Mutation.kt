@@ -3,6 +3,7 @@ package com.github.recognized.mutation
 import com.github.recognized.dataset.Sample
 import com.github.recognized.kodein
 import com.github.recognized.random.Chooser
+import com.github.recognized.random.FineTunedSubtreeChooser
 import com.github.recognized.random.SimpleSubtreeChooser
 import com.intellij.psi.PsiElement
 import org.kodein.di.Kodein
@@ -16,7 +17,7 @@ interface Mutation {
 
 fun Kodein.MainBuilder.mutations() {
     bind() from setBinding<Mutation>()
-    bind<Chooser<PsiElement, PsiElement>>() with singleton { SimpleSubtreeChooser(0.2) }
+    bind<Chooser<PsiElement, PsiElement>>() with singleton { FineTunedSubtreeChooser(SimpleSubtreeChooser(0.2)) }
 
     bind<Mutation>().inSet() with singleton { Replace(instance(), instance()) }
     bind<Mutation>().inSet() with singleton { Add(instance(), instance(), instance()) }
@@ -36,7 +37,8 @@ fun showChain(sample: Sample): String {
                 append(show(it.source, depth - 1))
                 append("\n----END OF FILE----\n")
             }
-            append("$depth. ${sample.parent?.let { "Used ${it.mutation.name}" } ?: ""} ${sample.metrics?.show(kernel)} \n\n")
+            append("$depth. ${sample.parent?.let { "Used ${it.mutation.name}" }
+                ?: ""} ${sample.metrics?.show(kernel)} \n\n")
             append(sample.file)
         }
     }

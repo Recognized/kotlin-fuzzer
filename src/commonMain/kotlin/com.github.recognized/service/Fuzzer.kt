@@ -44,15 +44,27 @@ data class Snippet(
 )
 
 @Serializable
+data class IntWithDispersion(
+    val value: Int,
+    val d: Int
+) {
+    override fun toString(): String {
+        return "$value±$d"
+    }
+}
+
+infix fun Int.plusMinus(other: Int): IntWithDispersion = IntWithDispersion(this, other)
+
+@Serializable
 data class Metrics(
-    val analyze: Int,
-    val generate: Int,
+    val analyze: IntWithDispersion,
+    val generate: IntWithDispersion,
     val successful: Boolean,
     val symbols: Int,
     val psiElements: Int
 ) {
     fun value(kernel: Kernel): Int {
-        return (kernel.fn(symbols.toDouble()) * ((analyze * generate) * 10.0 / psiElements)).toInt()
+        return (kernel.fn(symbols.toDouble()) * ((analyze.value * generate.value) * 10.0 / psiElements)).toInt()
     }
 
     fun show(kernel: Kernel): String {

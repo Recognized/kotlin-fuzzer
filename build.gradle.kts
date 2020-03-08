@@ -25,9 +25,9 @@ repositories {
 
 apply("plugin" to "com.github.node-gradle.node")
 
-val kotlin_version = "1.3.60"
-val ktor_version = "1.1.4"
-val logback_version = "1.2.3"
+val kotlinVersion = "1.3.60"
+val ktorVersion = "1.1.4"
+val logbackVersion = "1.2.3"
 
 kotlin {
     jvm {
@@ -69,11 +69,11 @@ kotlin {
         getByName("jvmMain") {
             dependencies {
                 implementation(kotlin("stdlib-jdk8"))
-                implementation("io.ktor:ktor-server-netty:$ktor_version")
-                implementation("io.ktor:ktor-client-apache:$ktor_version")
-                implementation("io.ktor:ktor-jackson:$ktor_version")
-                implementation("io.ktor:ktor-html-builder:$ktor_version")
-                implementation("ch.qos.logback:logback-classic:$logback_version")
+                implementation("io.ktor:ktor-server-netty:$ktorVersion")
+                implementation("io.ktor:ktor-client-apache:$ktorVersion")
+                implementation("io.ktor:ktor-jackson:$ktorVersion")
+                implementation("io.ktor:ktor-html-builder:$ktorVersion")
+                implementation("ch.qos.logback:logback-classic:$logbackVersion")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-runtime:0.14.0")
                 implementation("org.jetbrains.exposed:exposed:0.13.2")
                 implementation("org.apache.commons:commons-csv:1.1")
@@ -83,7 +83,7 @@ kotlin {
                 implementation("org.slf4j:slf4j-simple:1.7.29")
                 implementation("org.apache.commons:commons-csv:1.1")
                 implementation("org.kodein.di:kodein-di-generic-jvm:6.4.1")
-                implementation("org.jetbrains.kotlin:kotlin-compiler:$kotlin_version")
+                implementation("org.jetbrains.kotlin:kotlin-compiler:$kotlinVersion")
             }
         }
         getByName("jvmTest") {
@@ -96,7 +96,7 @@ kotlin {
         getByName("jsMain") {
             dependencies {
                 implementation(kotlin("stdlib-js"))
-                implementation("io.ktor:ktor-client-js:$ktor_version")
+                implementation("io.ktor:ktor-client-js:$ktorVersion")
                 implementation("org.jetbrains:kotlin-extensions:1.0.1-pre.69-kotlin-1.3.21")
                 implementation("org.jetbrains:kotlin-css-js:1.0.0-pre.69-kotlin-1.3.21")
                 implementation("org.jetbrains:kotlin-react:16.6.0-pre.69-kotlin-1.3.21")

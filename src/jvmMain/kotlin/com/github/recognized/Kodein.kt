@@ -24,7 +24,7 @@ fun Kodein.MainBuilder.mainKodein() {
     bind<PsiFacade>() with singleton { PsiFacade(Server, instance()) }
     bind<Random>() with singleton { Random(1999) }
     bind<List<String>>(CLASSPATH) with singleton { setupClasspath(instance()) }
-    constant(KOTLIN_HOME) with "/home/recog/.local/share/JetBrains/Toolbox/apps/IDEA-U/ch-1/193.5662.31/plugins/Kotlin/"
+    constant(KOTLIN_HOME) with "/home/recog/.local/share/JetBrains/Toolbox/apps/IDEA-U/ch-0/191.8026.42/plugins/Kotlin/"
     bind<FitnessFunction>() with singleton {
         getCompileTimeFitnessFunction(
             instance(),
@@ -52,7 +52,6 @@ fun setupClasspath(target: CompileTarget): List<String> {
                 "kotlin-stdlib-jdk8",
                 "kotlin-reflect"
             )
-            println(classLoader.urLs.toList())
             classLoader.urLs.filter { url ->
                 requiredJars.any { it in url.toString() }
             }.map { it.toURI().path }

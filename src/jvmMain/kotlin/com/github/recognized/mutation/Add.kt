@@ -3,6 +3,8 @@ package com.github.recognized.mutation
 import com.github.recognized.dataset.AllCorpuses
 import com.github.recognized.dataset.Sample
 import com.github.recognized.random.Chooser
+import com.github.recognized.random.shuffledSeq
+import com.github.recognized.runtime.choose
 import com.intellij.psi.PsiElement
 import com.intellij.psi.util.PsiTreeUtil
 import org.jetbrains.kotlin.js.translate.utils.PsiUtils
@@ -28,7 +30,7 @@ class Add(val random: Random, corpus: AllCorpuses, val subtreeChooser: Chooser<P
             it::class in mayHaveChildren
         } ?: return null
 
-        val addChildren = corpus.shuffled().firstNotNull {
+        val addChildren = corpus.shuffledSeq(random).firstNotNull {
             val t = it.tree ?: return@firstNotNull null
             subtreeChooser.choose(random, t) {
                 it.children.isNotEmpty() && it::class == source::class
