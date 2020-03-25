@@ -1,5 +1,6 @@
 package com.github.recognized
 
+import com.github.recognized.compile.Analyzer
 import com.github.recognized.compile.PsiFacade
 import com.github.recognized.dataset.corpuses
 import com.github.recognized.metrics.FitnessFunction
@@ -22,6 +23,7 @@ const val CLASSPATH = "classpath"
 fun Kodein.MainBuilder.mainKodein() {
     bind() from singleton { CompileTarget.Jvm }
     bind<PsiFacade>() with singleton { PsiFacade(Server, instance()) }
+    bind<Analyzer>() with singleton { Analyzer(Server) }
     bind<Random>() with singleton { Random(1999) }
     bind<List<String>>(CLASSPATH) with singleton { setupClasspath(instance()) }
     constant(KOTLIN_HOME) with "/home/recog/.local/share/JetBrains/Toolbox/apps/IDEA-U/ch-0/191.8026.42/plugins/Kotlin/"

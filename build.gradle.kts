@@ -34,6 +34,7 @@ dependencies {
     implementation("org.kodein.di:kodein-di-generic-jvm:6.4.1")
     implementation(project(":include:kotlin-compiler"))
     implementation(project(":idea:idea-core"))
+    implementation(project(":compiler:tests-common"))
     compile(intellijDep())
 
     Platform[192].orHigher {

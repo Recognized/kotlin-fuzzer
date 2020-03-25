@@ -23,7 +23,14 @@ import com.intellij.openapi.fileTypes.FileTypeRegistry
 import com.intellij.openapi.fileTypes.impl.FileTypeBean
 import com.intellij.openapi.fileTypes.impl.FileTypeManagerImpl
 import com.intellij.openapi.fileTypes.impl.FileTypeOverrider
+import com.intellij.openapi.module.ModuleManager
+import com.intellij.openapi.module.impl.ModuleManagerComponent
+import com.intellij.openapi.module.impl.ModuleManagerImpl
 import com.intellij.openapi.options.SchemeManagerFactory
+import com.intellij.openapi.projectRoots.Sdk
+import com.intellij.openapi.projectRoots.SdkType
+import com.intellij.openapi.projectRoots.impl.JavaSdkImpl
+import com.intellij.openapi.projectRoots.impl.ProjectJdkImpl
 import com.intellij.openapi.roots.ProjectFileIndex
 import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.roots.ProjectRootModificationTracker
@@ -47,6 +54,8 @@ import com.intellij.psi.impl.source.tree.TreeCopyHandler
 import com.intellij.psi.util.PsiUtil
 import com.intellij.testFramework.MockSchemeManagerFactory
 import com.intellij.testFramework.registerServiceInstance
+import org.jetbrains.kotlin.caches.resolve.IdePlatformKindResolution
+import org.jetbrains.kotlin.caches.resolve.JvmPlatformKindResolution
 import org.jetbrains.kotlin.caches.resolve.KotlinCacheService
 import org.jetbrains.kotlin.cli.common.CLIConfigurationKeys
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageLocation
@@ -57,15 +66,17 @@ import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.config.JVMConfigurationKeys
 import org.jetbrains.kotlin.idea.KotlinFileType
 import org.jetbrains.kotlin.idea.KotlinLanguage
-import org.jetbrains.kotlin.idea.caches.project.IdeaModuleInfo
-import org.jetbrains.kotlin.idea.caches.project.LibraryModificationTracker
-import org.jetbrains.kotlin.idea.caches.project.forcedModuleInfo
+import org.jetbrains.kotlin.idea.caches.project.*
+import org.jetbrains.kotlin.idea.caches.resolve.IdePackageOracleFactory
 import org.jetbrains.kotlin.idea.caches.resolve.KotlinCacheServiceImpl
 import org.jetbrains.kotlin.idea.caches.resolve.analyze
+import org.jetbrains.kotlin.idea.compiler.configuration.KotlinCommonCompilerArgumentsHolder
+import org.jetbrains.kotlin.idea.compiler.configuration.KotlinCompilerSettings
 import org.jetbrains.kotlin.idea.core.script.ScriptConfigurationManager
 import org.jetbrains.kotlin.idea.core.script.ScriptDependenciesModificationTracker
 import org.jetbrains.kotlin.idea.core.script.configuration.default
 import org.jetbrains.kotlin.platform.DefaultIdeTargetPlatformKindProvider
+import org.jetbrains.kotlin.platform.IdePlatformKind
 import org.jetbrains.kotlin.platform.TargetPlatform
 import org.jetbrains.kotlin.platform.impl.JvmIdePlatformKind
 import org.jetbrains.kotlin.psi.KtFile
@@ -125,6 +136,11 @@ class PsiFacade(
             FileTypeManagerImpl::class.java.canonicalName,
             ExtensionPoint.Kind.BEAN_CLASS
         )
+        Extensions.getRootArea().registerExtensionPoint(
+            "org.jetbrains.kotlin.idePlatformKind",
+            IdePlatformKind::class.java.canonicalName,
+            ExtensionPoint.Kind.BEAN_CLASS
+        )
         project.registerService(
             ProjectRootManager::class.java,
             ProjectRootManagerImpl(project)
@@ -154,6 +170,15 @@ class PsiFacade(
         project.registerService(PomModel::class.java, PomModelImpl(project))
         project.registerService(ScriptConfigurationManager::class.java, ScriptConfigurationManager.default(project))
         project.registerService(KotlinCacheService::class.java, KotlinCacheServiceImpl(project))
+        project.registerService(KotlinCommonCompilerArgumentsHolder::class.java, KotlinCommonCompilerArgumentsHolder(project))
+        project.registerService(PropertiesComponent::class.java, ProjectPropertiesComponentImpl())
+        project.registerService(KotlinCompilerSettings::class.java, KotlinCompilerSettings(project))
+        project.registerService(ModuleManager::class.java, ModuleManagerComponent(project))
+        project.registerService(IdePackageOracleFactory::class.java, IdePackageOracleFactory(project))
+        IdePlatformKindResolution.registerExtensionPoint()
+        IdePlatformKindResolution.registerExtension(JvmPlatformKindResolution())
+        Extensions.getRootArea().getExtensionPoint<JvmIdePlatformKind>("org.jetbrains.kotlin.idePlatformKind")
+            .registerExtension(JvmIdePlatformKind)
         env
     }
 
@@ -165,7 +190,10 @@ class PsiFacade(
             0,
             file.length
         ) as KtFile?)?.apply {
-            UserDataProperty<KtFile, IdeaModuleInfo>(Key.create("FORCED_MODULE_INFO")).setValue(this, Int.Companion::MAX_VALUE, IdeaModuleInfo)
+            forcedModuleInfo = SdkInfo(
+                project,
+                ProjectJdkImpl("1.8", JavaSdkImpl())
+            )
         }
     }
 
