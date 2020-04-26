@@ -67,3 +67,8 @@ fun unsupportedCompileTarget(target: CompileTarget): Nothing = error("Unsupporte
 val kodein = Kodein {
     mainKodein()
 }
+
+inline fun <reified T : Any> Kodein.value(): T {
+    val value by kodein.instance<T>()
+    return value
+}

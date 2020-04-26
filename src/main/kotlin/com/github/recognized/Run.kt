@@ -132,7 +132,7 @@ data class Run(
             val mutation = mutationChooser.choose(random, mutations)!!
             val sample = sampleChooser.choose(random, generation)!!
             val code = mutation.mutate(generation, sample) ?: error("Mutation $mutation failed to mutate")
-            if (code == sample.tree?.text) {
+            if (code == sample.tree?.file?.text) {
                 error("Nothing changed after mutation $mutation")
             }
             MutationInfo(sample, mutation, code)

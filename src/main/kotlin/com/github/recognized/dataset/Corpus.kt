@@ -5,11 +5,9 @@ import com.github.recognized.kodein
 import com.github.recognized.mutation.MutationInfo
 import com.github.recognized.service.Kernel
 import com.github.recognized.service.Metrics
-import kotlinx.serialization.ContextualSerialization
+import com.github.recognized.value
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
-import kotlinx.serialization.UseSerializers
-import org.jetbrains.kotlin.psi.KtElement
 import org.kodein.di.Kodein
 import org.kodein.di.generic.*
 
@@ -18,23 +16,15 @@ interface Corpus {
 }
 
 @Serializable
-data class Type(
-    val start: Int,
-    val end: Int,
-    val value: String
-)
-
-@Serializable
 data class Sample(
     val metrics: Metrics?,
     val id: String?,
     val file: String
 ) {
-    private val facade by kodein.instance<PsiFacade>()
     @Transient
     var parent: MutationInfo? = null
 
-    val tree: KtElement? get() = facade.getPsi(file)
+    val tree by lazy { kodein.value<PsiFacade>().getPsiExt(file) }
 }
 
 fun Kodein.MainBuilder.corpuses() {

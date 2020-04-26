@@ -81,10 +81,17 @@ import org.jetbrains.kotlin.platform.TargetPlatform
 import org.jetbrains.kotlin.platform.impl.JvmIdePlatformKind
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.UserDataProperty
+import org.jetbrains.kotlin.resolve.BindingContext
 import java.io.File
 import java.nio.file.spi.FileTypeDetector
 
 private val log = logger("PsiFacade")
+
+data class PsiResult(val file: KtFile) {
+    val context by lazy {
+        file.analyze()
+    }
+}
 
 class PsiFacade(
     parentDisposable: Disposable,
@@ -197,8 +204,10 @@ class PsiFacade(
         }
     }
 
-    fun getPsiExt(file: CharSequence) {
-        getPsi(file)!!.analyze()
+    fun getPsiExt(file: CharSequence): PsiResult? {
+        return getPsi(file)?.let {
+            PsiResult(it)
+        }
     }
 }
 
