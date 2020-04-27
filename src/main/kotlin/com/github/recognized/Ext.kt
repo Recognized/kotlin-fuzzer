@@ -1,16 +1,20 @@
 package com.github.recognized
 
-import kotlinx.serialization.DeserializationStrategy
-import kotlinx.serialization.SerializationStrategy
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonConfiguration
+import com.fasterxml.jackson.core.type.TypeReference
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 
 interface RPCService
 
-fun <T> stringify(serializer: SerializationStrategy<T>, any: T): String {
-    return Json(JsonConfiguration.Stable.copy(prettyPrint = true)).stringify(serializer, any)
+val mapper = jacksonObjectMapper().registerKotlinModule()
+
+fun <T> stringify(any: T): String {
+    return mapper.writeValueAsString(any)
 }
 
-fun <T> parse(serializer: DeserializationStrategy<T>, any: String): T {
-    return Json(JsonConfiguration.Stable).parse(serializer, any)
+inline fun <reified T> parse(any: String): T {
+    return when {
+        T::class == List::class -> mapper.readValue(any, object : TypeReference<T>() {})
+        else -> mapper.readValue(any, T::class.java)
+    }
 }

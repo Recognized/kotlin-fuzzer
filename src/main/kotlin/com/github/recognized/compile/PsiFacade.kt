@@ -1,8 +1,6 @@
 package com.github.recognized.compile
 
-import com.github.recognized.CompileTarget
-import com.github.recognized.Config
-import com.github.recognized.configurationFiles
+import com.github.recognized.*
 import com.github.recognized.runtime.logger
 import com.intellij.core.CoreApplicationEnvironment
 import com.intellij.ide.highlighter.FileTypeRegistrator
@@ -62,6 +60,7 @@ import org.jetbrains.kotlin.cli.common.messages.CompilerMessageLocation
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment
+import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreProjectEnvironment
 import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.config.JVMConfigurationKeys
 import org.jetbrains.kotlin.idea.KotlinFileType
@@ -79,6 +78,7 @@ import org.jetbrains.kotlin.platform.DefaultIdeTargetPlatformKindProvider
 import org.jetbrains.kotlin.platform.IdePlatformKind
 import org.jetbrains.kotlin.platform.TargetPlatform
 import org.jetbrains.kotlin.platform.impl.JvmIdePlatformKind
+import org.jetbrains.kotlin.psi.KtElement
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.UserDataProperty
 import org.jetbrains.kotlin.resolve.BindingContext
@@ -87,14 +87,10 @@ import java.nio.file.spi.FileTypeDetector
 
 private val log = logger("PsiFacade")
 
-data class PsiResult(val file: KtFile) {
-    val context by lazy {
-        file.analyze()
-    }
-}
+data class PsiResult(val file: KtFile, val context: BindingContext)
 
 class PsiFacade(
-    parentDisposable: Disposable,
+    val parentDisposable: Disposable,
     target: CompileTarget,
     private val configuration: CompilerConfiguration.() -> Unit = {}
 ) {
@@ -107,85 +103,6 @@ class PsiFacade(
         }
         cfg.put(CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY, messageCollector)
         val env = KotlinCoreEnvironment.createForTests(parentDisposable, cfg, target.configurationFiles)
-        val project = env.project as MockProject
-        Extensions.getArea(null).registerExtensionPoint(
-            "com.intellij.treeCopyHandler",
-            TreeCopyHandler::class.java.canonicalName,
-            ExtensionPoint.Kind.INTERFACE
-        )
-        Extensions.getRootArea().registerExtensionPoint(
-            "com.intellij.fileType",
-            FileTypeBean::class.java.canonicalName,
-            ExtensionPoint.Kind.BEAN_CLASS
-        )
-        Extensions.getRootArea().registerExtensionPoint(
-            "com.intellij.fileTypeFactory",
-            FileTypeFactory::class.java.canonicalName,
-            ExtensionPoint.Kind.BEAN_CLASS
-        )
-        Extensions.getRootArea().registerExtensionPoint(
-            FileTypeRegistrator.EP_NAME.name,
-            FileTypeRegistrator::class.java.canonicalName,
-            ExtensionPoint.Kind.INTERFACE
-        )
-        Extensions.getRootArea().registerExtensionPoint(
-            FileTypeRegistry.FileTypeDetector.EP_NAME.name,
-            FileTypeRegistry.FileTypeDetector::class.java.canonicalName,
-            ExtensionPoint.Kind.INTERFACE
-        )
-        Extensions.getRootArea().registerExtensionPoint(
-            FileTypeOverrider.EP_NAME.name,
-            FileTypeOverrider::class.java.canonicalName,
-            ExtensionPoint.Kind.INTERFACE
-        )
-        Extensions.getRootArea().registerExtensionPoint(
-            "com.intellij.openapi.fileTypes.FileTypeManager",
-            FileTypeManagerImpl::class.java.canonicalName,
-            ExtensionPoint.Kind.BEAN_CLASS
-        )
-        Extensions.getRootArea().registerExtensionPoint(
-            "org.jetbrains.kotlin.idePlatformKind",
-            IdePlatformKind::class.java.canonicalName,
-            ExtensionPoint.Kind.BEAN_CLASS
-        )
-        project.registerService(
-            ProjectRootManager::class.java,
-            ProjectRootManagerImpl(project)
-        )
-        env.projectEnvironment.environment.registerApplicationService(
-            PropertiesComponent::class.java,
-            ProjectPropertiesComponentImpl()
-        )
-        env.projectEnvironment.environment.registerApplicationService(
-            EditorFactory::class.java,
-            MockEditorFactory()
-        )
-        env.projectEnvironment.environment.registerApplicationService(
-            DefaultIdeTargetPlatformKindProvider::class.java,
-            object : DefaultIdeTargetPlatformKindProvider {
-                override val defaultPlatform: TargetPlatform
-                    get() = JvmIdePlatformKind.defaultPlatform
-            }
-        )
-        project.registerService(DirectoryIndex::class.java, DirectoryIndexImpl(project))
-        project.registerService(ProjectFileIndex::class.java, ProjectFileIndexImpl(project))
-        project.registerService(LibraryModificationTracker::class.java, LibraryModificationTracker(project))
-        project.registerService(ScriptDependenciesModificationTracker::class.java, ScriptDependenciesModificationTracker())
-        project.registerService(ProjectRootModificationTracker::class.java, ProjectRootModificationTrackerImpl(project))
-        env.projectEnvironment.environment.registerApplicationService(SchemeManagerFactory::class.java, MockSchemeManagerFactory())
-        env.projectEnvironment.environment.registerApplicationService(FileTypeManager::class.java, FileTypeManagerImpl())
-        project.registerService(PomModel::class.java, PomModelImpl(project))
-        project.registerService(ScriptConfigurationManager::class.java, ScriptConfigurationManager.default(project))
-        project.registerService(KotlinCacheService::class.java, KotlinCacheServiceImpl(project))
-        project.registerService(KotlinCommonCompilerArgumentsHolder::class.java, KotlinCommonCompilerArgumentsHolder(project))
-        project.registerService(PropertiesComponent::class.java, ProjectPropertiesComponentImpl())
-        project.registerService(KotlinCompilerSettings::class.java, KotlinCompilerSettings(project))
-        project.registerService(ModuleManager::class.java, ModuleManagerComponent(project))
-        project.registerService(IdePackageOracleFactory::class.java, IdePackageOracleFactory(project))
-        IdePlatformKindResolution.registerExtensionPoint()
-        IdePlatformKindResolution.registerExtension(JvmPlatformKindResolution())
-        Extensions.getRootArea().getExtensionPoint<JvmIdePlatformKind>("org.jetbrains.kotlin.idePlatformKind")
-            .registerExtension(JvmIdePlatformKind)
         env
     }
 
@@ -204,12 +121,13 @@ class PsiFacade(
         }
     }
 
-    fun getPsiExt(file: CharSequence): PsiResult? {
-        return getPsi(file)?.let {
-            PsiResult(it)
-        }
+    fun getPsiExt(text: CharSequence): PsiResult? {
+        val (context, file) = Analyzer(parentDisposable).analyze(text.toString())
+        return PsiResult(file, context)
     }
 }
+
+
 
 fun PsiElement.hasErrorBelow(): Boolean {
     return PsiUtil.hasErrorElementChild(this) || children.any {
@@ -241,3 +159,5 @@ class SimpleMessageCollector : MessageCollector {
         }
     }
 }
+
+val PsiElement.kt get() = this as? KtElement

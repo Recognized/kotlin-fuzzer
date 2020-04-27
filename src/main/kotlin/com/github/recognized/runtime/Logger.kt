@@ -41,3 +41,50 @@ class Logger(private val parent: Logger) {
         }
     }
 }
+//
+//fun logger(name: String): Logger {
+//    return Logger(name)
+//}
+//
+//var isInfoEnabled = true
+//var isDebugEnabled = true
+//var isErrorEnabled = true
+//var isTraceEnabled = true
+//
+//class Logger(val name: String) {
+//
+//    private fun report(severity: String, msg: String) {
+//        println("[$name] $severity $msg")
+//    }
+//
+//    fun info(msg: () -> Any?) {
+//        if (isInfoEnabled) {
+//            report("DEBUG", msg().toString())
+//        }
+//    }
+//
+//    fun debug(msg: () -> Any?) {
+//        if (isDebugEnabled) {
+//            report("DEBUG", msg().toString())
+//        }
+//    }
+//
+//    fun error(msg: () -> Any?): Nothing? {
+//        if (isErrorEnabled) {
+//            report("ERROR", msg().toString())
+//        }
+//        return null
+//    }
+//
+//    fun trace(msg: () -> Any?) {
+//        if (isTraceEnabled) {
+//            report("TRACE", msg().toString())
+//        }
+//    }
+//
+//    fun error(ex: Throwable) {
+//        if (isErrorEnabled) {
+//            report("ERROR", StringWriter().also { ex.printStackTrace(PrintWriter(it)) }.toString())
+//        }
+//    }
+//}

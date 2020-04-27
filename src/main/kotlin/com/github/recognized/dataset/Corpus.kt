@@ -1,13 +1,11 @@
 package com.github.recognized.dataset
 
-import com.github.recognized.compile.PsiFacade
-import com.github.recognized.kodein
+import com.fasterxml.jackson.annotation.JsonIgnore
+import com.github.recognized.Server
+import com.github.recognized.compile.resolveText
 import com.github.recognized.mutation.MutationInfo
 import com.github.recognized.service.Kernel
 import com.github.recognized.service.Metrics
-import com.github.recognized.value
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.Transient
 import org.kodein.di.Kodein
 import org.kodein.di.generic.*
 
@@ -15,16 +13,16 @@ interface Corpus {
     fun samples(): List<Sample>
 }
 
-@Serializable
 data class Sample(
     val metrics: Metrics?,
     val id: String?,
     val file: String
 ) {
     @Transient
+    @JsonIgnore
     var parent: MutationInfo? = null
 
-    val tree by lazy { kodein.value<PsiFacade>().getPsiExt(file) }
+    val tree by lazy { resolveText(file, Server) }
 }
 
 fun Kodein.MainBuilder.corpuses() {

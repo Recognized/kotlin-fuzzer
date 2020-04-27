@@ -1,7 +1,6 @@
 package com.github.recognized.service
 
 import com.github.recognized.RPCService
-import kotlinx.serialization.Serializable
 
 
 interface Fuzzer : RPCService {
@@ -17,17 +16,14 @@ interface Fuzzer : RPCService {
     suspend fun generation(offset: Int, count: Int, sortBy: SortOrder, onlyMutated: Boolean): List<Snippet>
 }
 
-@Serializable
 enum class SortOrder {
     Score, Analyze, Generate, PsiElement, Symbols, Name
 }
 
-@Serializable
 enum class State {
     Stop, Start, Pause
 }
 
-@Serializable
 data class Statistics(
     val uptime: Int,
     val run: State,
@@ -36,14 +32,12 @@ data class Statistics(
     val state: String
 )
 
-@Serializable
 data class Snippet(
     val id: String,
     val metrics: Metrics,
     val value: Int
 )
 
-@Serializable
 data class IntWithDispersion(
     val value: Int,
     val d: Int
@@ -55,7 +49,6 @@ data class IntWithDispersion(
 
 infix fun Int.plusMinus(other: Int): IntWithDispersion = IntWithDispersion(this, other)
 
-@Serializable
 data class Metrics(
     val analyze: IntWithDispersion,
     val generate: IntWithDispersion,

@@ -5,26 +5,19 @@ import com.github.recognized.compile.PsiFacade
 import com.github.recognized.compile.hasErrorBelow
 import com.github.recognized.kodein
 import com.github.recognized.metrics.FitnessFunction
+import com.github.recognized.parse
 import com.github.recognized.runtime.disposing
 import com.github.recognized.runtime.logger
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonConfiguration
-import kotlinx.serialization.list
-import kotlinx.serialization.parse
+import com.github.recognized.stringify
 import org.apache.commons.csv.CSVFormat
 import org.apache.commons.csv.CSVParser
-import org.kodein.di.Kodein
-import org.kodein.di.KodeinAware
 import org.kodein.di.generic.instance
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 
-@Serializable
 class CodeCount(val count: Int, val success: Boolean, val codes: List<Code>)
 
-@Serializable
 class Code(val code: String)
 
 private val log = logger("YouTrack")
@@ -75,12 +68,11 @@ fun splitCanCompile(data: Collection<String>): Map<Boolean, List<String>> {
 fun saveFilteredData(data: Map<Boolean, List<String>>, dataDir: Path, suffix: String = "") {
     val failed = data[false].orEmpty().map(::Code).let { CodeCount(it.size, false, it) }
     val succeeded = data[true].orEmpty().map(::Code).let { CodeCount(it.size, true, it) }
-    val json = Json(JsonConfiguration.Stable.copy(prettyPrint = true))
     Files.newBufferedWriter(dataDir.resolve("failed$suffix.json")).use {
-        it.write(json.stringify(CodeCount.serializer(), failed))
+        it.write(stringify(failed))
     }
     Files.newBufferedWriter(dataDir.resolve("succeeded$suffix.json")).use {
-        it.write(json.stringify(CodeCount.serializer(), succeeded))
+        it.write(stringify(succeeded))
     }
 }
 
@@ -88,8 +80,11 @@ const val YOUTRACK_DIR = "data/youtrack"
 const val KOTLIN_TESTS_DIR = "data/kotlin-tests"
 
 fun loadData(dataDir: Path, suffix: String = ""): CodeCount {
+    log.info { "Loading data: $dataDir" }
     return Files.newBufferedReader(dataDir.resolve("succeeded$suffix.json")).use {
-        Json(JsonConfiguration.Stable).parse(CodeCount.serializer(), it.readText())
+        parse<CodeCount>(it.readText())
+    }.also {
+        log.info { "Finished loading: $dataDir" }
     }
 }
 

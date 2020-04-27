@@ -15,7 +15,6 @@ import com.github.recognized.service.Statistics
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.util.Disposer
 import kotlinx.coroutines.*
-import kotlinx.serialization.list
 import org.kodein.di.generic.instance
 import java.io.File
 import kotlin.coroutines.CoroutineContext
@@ -99,7 +98,7 @@ object Server : CoroutineScope, Disposable by Disposer.newDisposable() {
         val file = File("tmp.kt")
         if (file.exists()) {
             try {
-                return parse(Sample.serializer().list, file.readText())
+                return parse(file.readText())
             } catch (ex: Throwable) {
                 log.info { "Could not load saved generation..." }
             }
@@ -137,7 +136,7 @@ object Server : CoroutineScope, Disposable by Disposer.newDisposable() {
             }
         }
         file.bufferedWriter().use {
-            it.write(stringify(Sample.serializer().list, generation))
+            it.write(stringify(generation))
         }
         return generation
     }

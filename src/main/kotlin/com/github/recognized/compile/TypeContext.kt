@@ -4,13 +4,46 @@
  */
 package com.github.recognized.compile
 
+import com.intellij.core.CoreApplicationEnvironment
+import com.intellij.core.CoreFileTypeRegistry
+import com.intellij.ide.highlighter.FileTypeRegistrator
+import com.intellij.ide.util.ProjectPropertiesComponentImpl
+import com.intellij.ide.util.PropertiesComponent
+import com.intellij.lang.LanguageParserDefinitions
+import com.intellij.mock.MockEditorFactory
+import com.intellij.mock.MockProject
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.editor.EditorFactory
+import com.intellij.openapi.extensions.ExtensionPoint
+import com.intellij.openapi.extensions.Extensions
+import com.intellij.openapi.extensions.ExtensionsArea
+import com.intellij.openapi.fileTypes.*
+import com.intellij.openapi.fileTypes.impl.FileTypeBean
+import com.intellij.openapi.fileTypes.impl.FileTypeManagerImpl
+import com.intellij.openapi.fileTypes.impl.FileTypeOverrider
+import com.intellij.openapi.module.ModuleManager
+import com.intellij.openapi.module.impl.ModuleManagerComponent
+import com.intellij.openapi.options.SchemeManagerFactory
+import com.intellij.openapi.project.Project
+import com.intellij.openapi.roots.ProjectFileIndex
+import com.intellij.openapi.roots.ProjectRootManager
+import com.intellij.openapi.roots.ProjectRootModificationTracker
+import com.intellij.openapi.roots.ProjectRootModificationTrackerImpl
+import com.intellij.openapi.roots.impl.DirectoryIndex
+import com.intellij.openapi.roots.impl.DirectoryIndexImpl
+import com.intellij.openapi.roots.impl.ProjectFileIndexImpl
+import com.intellij.openapi.roots.impl.ProjectRootManagerImpl
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.util.text.StringUtil
+import com.intellij.pom.PomModel
+import com.intellij.pom.core.impl.PomModelImpl
+import com.intellij.psi.LanguageFileViewProviders
 import com.intellij.psi.PsiElement
+import com.intellij.psi.impl.source.tree.TreeCopyHandler
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.rt.execution.junit.FileComparisonFailure
+import com.intellij.testFramework.MockSchemeManagerFactory
 import junit.framework.AssertionFailedError
 import junit.framework.TestCase
 import org.assertj.core.util.Files
@@ -18,10 +51,14 @@ import org.jetbrains.kotlin.TestsCompilerError
 import org.jetbrains.kotlin.analyzer.AnalysisResult
 import org.jetbrains.kotlin.analyzer.common.CommonResolverForModuleFactory
 import org.jetbrains.kotlin.builtins.jvm.JvmBuiltIns
+import org.jetbrains.kotlin.caches.resolve.IdePlatformKindResolution
+import org.jetbrains.kotlin.caches.resolve.JvmPlatformKindResolution
+import org.jetbrains.kotlin.caches.resolve.KotlinCacheService
 import org.jetbrains.kotlin.checkers.BaseDiagnosticsTest
 import org.jetbrains.kotlin.checkers.CompilerTestLanguageVersionSettings
 import org.jetbrains.kotlin.checkers.LazyOperationsLog
 import org.jetbrains.kotlin.checkers.LoggingStorageManager
+import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment
 import org.jetbrains.kotlin.cli.jvm.compiler.NoScopeRecordCliBindingTrace
 import org.jetbrains.kotlin.cli.jvm.compiler.TopDownAnalyzerFacadeForJVM
 import org.jetbrains.kotlin.config.*
@@ -43,12 +80,27 @@ import org.jetbrains.kotlin.fir.AbstractFirOldFrontendDiagnosticsTest
 import org.jetbrains.kotlin.fir.loadTestDataWithoutDiagnostics
 import org.jetbrains.kotlin.frontend.java.di.createContainerForLazyResolveWithJava
 import org.jetbrains.kotlin.frontend.java.di.initJvmBuiltInsForTopDownAnalysis
+import org.jetbrains.kotlin.idea.KotlinFileType
+import org.jetbrains.kotlin.idea.KotlinLanguage
+import org.jetbrains.kotlin.idea.caches.project.LibraryModificationTracker
+import org.jetbrains.kotlin.idea.caches.resolve.IdePackageOracleFactory
+import org.jetbrains.kotlin.idea.caches.resolve.KotlinCacheServiceImpl
+import org.jetbrains.kotlin.idea.compiler.configuration.KotlinCommonCompilerArgumentsHolder
+import org.jetbrains.kotlin.idea.compiler.configuration.KotlinCompilerSettings
+import org.jetbrains.kotlin.idea.core.script.ScriptConfigurationManager
+import org.jetbrains.kotlin.idea.core.script.ScriptDependenciesModificationTracker
+import org.jetbrains.kotlin.idea.core.script.configuration.default
 import org.jetbrains.kotlin.incremental.components.ExpectActualTracker
 import org.jetbrains.kotlin.incremental.components.LookupTracker
 import org.jetbrains.kotlin.load.java.lazy.SingleModuleClassResolver
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.name.SpecialNames
+import org.jetbrains.kotlin.parsing.KotlinParserDefinition
+import org.jetbrains.kotlin.platform.DefaultIdeTargetPlatformKindProvider
+import org.jetbrains.kotlin.platform.IdePlatformKind
+import org.jetbrains.kotlin.platform.TargetPlatform
+import org.jetbrains.kotlin.platform.impl.JvmIdePlatformKind
 import org.jetbrains.kotlin.platform.isCommon
 import org.jetbrains.kotlin.platform.jvm.JvmPlatforms
 import org.jetbrains.kotlin.psi.KtFile
@@ -77,6 +129,84 @@ import java.util.*
 import java.util.function.Predicate
 import java.util.regex.Pattern
 
+object GlobalRegistrations {
+    init {
+        Extensions.getRootArea().registerIfNotExists(
+            TreeCopyHandler.EP_NAME.name,
+            TreeCopyHandler::class.java,
+            ExtensionPoint.Kind.INTERFACE
+        )
+        Extensions.getRootArea().registerIfNotExists(
+            "com.intellij.fileType",
+            FileTypeBean::class.java,
+            ExtensionPoint.Kind.BEAN_CLASS
+        )
+        Extensions.getRootArea().registerIfNotExists(
+            FileTypeFactory.FILE_TYPE_FACTORY_EP.name,
+            FileTypeFactory::class.java,
+            ExtensionPoint.Kind.BEAN_CLASS
+        )
+        Extensions.getRootArea().registerIfNotExists(
+            FileTypeRegistrator.EP_NAME.name,
+            FileTypeRegistrator::class.java,
+            ExtensionPoint.Kind.INTERFACE
+        )
+        Extensions.getRootArea().registerIfNotExists(
+            FileTypeRegistry.FileTypeDetector.EP_NAME.name,
+            FileTypeRegistry.FileTypeDetector::class.java,
+            ExtensionPoint.Kind.INTERFACE
+        )
+        Extensions.getRootArea().registerIfNotExists(
+            FileTypeOverrider.EP_NAME.name,
+            FileTypeOverrider::class.java,
+            ExtensionPoint.Kind.INTERFACE
+        )
+        Extensions.getRootArea().registerIfNotExists(
+            "com.intellij.openapi.fileTypes.FileTypeManager",
+            FileTypeManagerImpl::class.java,
+            ExtensionPoint.Kind.BEAN_CLASS
+        )
+        Extensions.getRootArea().registerIfNotExists(
+            "org.jetbrains.kotlin.idePlatformKind",
+            IdePlatformKind::class.java,
+            ExtensionPoint.Kind.BEAN_CLASS
+        )
+        Extensions.getRootArea().registerIfNotExists(
+            IdePlatformKindResolution.extensionPointName.name,
+            IdePlatformKindResolution::class.java,
+            ExtensionPoint.Kind.INTERFACE
+        )
+        IdePlatformKindResolution.registerExtension(JvmPlatformKindResolution())
+        Extensions.getRootArea().getExtensionPoint<JvmIdePlatformKind>("org.jetbrains.kotlin.idePlatformKind")
+            .registerExtension(JvmIdePlatformKind)
+    }
+
+    private fun <T : Any> ExtensionsArea.registerIfNotExists(name: String, klass: Class<T>, kind: ExtensionPoint.Kind) {
+        val service = try {
+            getExtensionPoint<T>(name)
+        } catch (ex: Throwable) {
+            null
+        }
+        if (service != null) {
+            println("EP $klass is already registered")
+        } else {
+            registerExtensionPoint(name, klass.canonicalName, kind)
+        }
+    }
+
+    val fileTypeManager by lazy { FileTypeManagerImpl() }
+    val mockSchemeManager by lazy { MockSchemeManagerFactory() }
+
+    val applicationEnv by lazy {
+
+    }
+}
+
+fun resolveText(text: String, disposable: Disposable): PsiResult? {
+    val (context, file) = Analyzer(disposable).analyze(text)
+    return PsiResult(file, context)
+}
+
 class Analyzer(disposable: Disposable) : BaseDiagnosticsTest() {
     override fun analyzeAndCheck(testDataFile: File, files: List<TestFile>) {
         try {
@@ -102,7 +232,7 @@ class Analyzer(disposable: Disposable) : BaseDiagnosticsTest() {
     }
 
     fun analyze(text: String): Pair<BindingContext, KtFile> {
-        val file = File.createTempFile("test", "_", testPath)
+        val file = File.createTempFile("test", "_.kt", testPath)
         file.bufferedWriter().use { it.write(text) }
         var expectedText = KotlinTestUtils.doLoadFile(file)
         if (coroutinesPackage.isNotEmpty()) {
@@ -115,7 +245,78 @@ class Analyzer(disposable: Disposable) : BaseDiagnosticsTest() {
         return analyzeAndCheckUnhandled(file, files).first().let { it.context to it.files.first() }
     }
 
+
+    override fun setupEnvironment(environment: KotlinCoreEnvironment) {
+        val project = environment.project as MockProject
+        GlobalRegistrations
+
+        environment.projectEnvironment.environment.registerIfNotExists(
+            PropertiesComponent::class.java,
+            ProjectPropertiesComponentImpl()
+        )
+        environment.projectEnvironment.environment.registerIfNotExists(
+            EditorFactory::class.java,
+            MockEditorFactory()
+        )
+        environment.projectEnvironment.environment.registerIfNotExists(
+            DefaultIdeTargetPlatformKindProvider::class.java,
+            object : DefaultIdeTargetPlatformKindProvider {
+                override val defaultPlatform: TargetPlatform
+                    get() = JvmIdePlatformKind.defaultPlatform
+            }
+        )
+        environment.projectEnvironment.environment.registerIfNotExists(
+            SchemeManagerFactory::class.java,
+            GlobalRegistrations.mockSchemeManager
+        )
+        environment.projectEnvironment.environment.registerIfNotExists(FileTypeManager::class.java, GlobalRegistrations.fileTypeManager)
+        project.registerIfNotExists(ProjectRootManager::class.java, ProjectRootManagerImpl(project))
+        project.registerIfNotExists(DirectoryIndex::class.java, DirectoryIndexImpl(project))
+        project.registerIfNotExists(ProjectFileIndex::class.java, ProjectFileIndexImpl(project))
+        project.registerIfNotExists(LibraryModificationTracker::class.java, LibraryModificationTracker(project))
+        project.registerIfNotExists(ScriptDependenciesModificationTracker::class.java, ScriptDependenciesModificationTracker())
+        project.registerIfNotExists(ProjectRootModificationTracker::class.java, ProjectRootModificationTrackerImpl(project))
+//        project.registerIfNotExists(PomModel::class.java, PomModelImpl(project))
+        project.registerIfNotExists(ScriptConfigurationManager::class.java, ScriptConfigurationManager.default(project))
+        project.registerIfNotExists(KotlinCacheService::class.java, KotlinCacheServiceImpl(project))
+//        project.registerIfNotExists(KotlinCommonCompilerArgumentsHolder::class.java, KotlinCommonCompilerArgumentsHolder(project))
+//        project.registerIfNotExists(PropertiesComponent::class.java, ProjectPropertiesComponentImpl())
+//        project.registerIfNotExists(KotlinCompilerSettings::class.java, KotlinCompilerSettings(project))
+        project.registerIfNotExists(ModuleManager::class.java, ModuleManagerComponent(project))
+//        project.registerIfNotExists(IdePackageOracleFactory::class.java, IdePackageOracleFactory(project))
+    }
+
+    private fun <T : Any> CoreApplicationEnvironment.registerIfNotExists(klass: Class<T>, instance: T) {
+        val service = try {
+            application.getService(klass, false)
+        } catch (ex: Throwable) {
+            null
+        }
+        if (service != null) {
+            println("Class $klass is already registered")
+        } else {
+            registerApplicationService(klass, instance)
+        }
+    }
+
+    private fun <T : Any> MockProject.registerIfNotExists(klass: Class<T>, instance: T) {
+        val service = try {
+            getService(klass, false)
+        } catch (ex: Throwable) {
+            null
+        }
+        if (service != null) {
+            println("Class $klass is already registered")
+        } else {
+            registerService(klass, instance)
+        }
+    }
+
     class RResult(val context: BindingContext, val files: List<KtFile>)
+
+    override fun isJavaSourceRootNeeded(): Boolean {
+        return true
+    }
 
     override fun isKotlinSourceRootNeeded(): Boolean {
         return true
@@ -152,15 +353,14 @@ class Analyzer(disposable: Disposable) : BaseDiagnosticsTest() {
 
             val oldModule = modules[testModule]!!
 
-            val languageVersionSettings =
-                if (coroutinesPackage.isNotEmpty()) {
-                    val isExperimental = coroutinesPackage == DescriptorUtils.COROUTINES_PACKAGE_FQ_NAME_EXPERIMENTAL.asString()
-                    CompilerTestLanguageVersionSettings(
-                        DEFAULT_DIAGNOSTIC_TESTS_FEATURES,
-                        if (isExperimental) ApiVersion.KOTLIN_1_2 else ApiVersion.KOTLIN_1_3,
-                        if (isExperimental) LanguageVersion.KOTLIN_1_2 else LanguageVersion.KOTLIN_1_3
-                    )
-                } else loadLanguageVersionSettings(testFilesInModule)
+            val languageVersionSettings = CompilerTestLanguageVersionSettings(
+                mapOf(
+                    LanguageFeature.Coroutines to LanguageFeature.State.ENABLED,
+                    LanguageFeature.NewInference to LanguageFeature.State.DISABLED
+                ),
+                ApiVersion.KOTLIN_1_3,
+                LanguageVersion.KOTLIN_1_3
+            )
 
             languageVersionSettingsByModule[testModule] = languageVersionSettings
 
@@ -196,107 +396,6 @@ class Analyzer(disposable: Disposable) : BaseDiagnosticsTest() {
         return res
     }
 
-    private fun checkFirTestdata(testDataFile: File, files: List<TestFile>) {
-        val firTestDataFile = File(testDataFile.absolutePath.replace(".kt", ".fir.kt"))
-        val firFailFile = File(testDataFile.absolutePath.replace(".kt", ".fir.fail"))
-        when {
-            firFailFile.exists() -> return
-            firTestDataFile.exists() -> checkOriginalAndFirTestdataIdentity(testDataFile, firTestDataFile)
-            else -> runFirTestAndGenerateTestData(testDataFile, firTestDataFile, files)
-        }
-    }
-
-    private fun checkOriginalAndFirTestdataIdentity(testDataFile: File, firTestDataFile: File) {
-        val originalTestData = loadTestDataWithoutDiagnostics(testDataFile)
-        val firTestData = loadTestDataWithoutDiagnostics(firTestDataFile)
-        val message = "Original and fir test data doesn't identical. Please, add changes from ${testDataFile.name} to ${firTestDataFile.name}"
-        TestCase.assertEquals(message, originalTestData, firTestData)
-    }
-
-    private fun runFirTestAndGenerateTestData(testDataFile: File, firTestDataFile: File, files: List<TestFile>) {
-        val testRunner = object : AbstractFirOldFrontendDiagnosticsTest() {
-            init {
-                environment = this@Analyzer.environment
-            }
-        }
-        if (testDataFile.readText().contains("// FIR_IDENTICAL")) {
-            try {
-                testRunner.analyzeAndCheckUnhandled(testDataFile, files)
-            } catch (e: FileComparisonFailure) {
-                println("Old FE & FIR produces different diagnostics for this file. Please remove FIR_IDENTICAL line manually")
-                throw FileComparisonFailure(
-                    "Old FE & FIR produces different diagnostics for this file. Please remove FIR_IDENTICAL line manually\n" +
-                            e.message,
-                    e.expected, e.actual, e.filePath, e.actualFilePath
-                )
-            }
-        } else {
-            FileUtil.copy(testDataFile, firTestDataFile)
-            testRunner.analyzeAndCheckUnhandled(firTestDataFile, files)
-        }
-    }
-
-    private fun StringBuilder.cleanupInferenceDiagnostics(): String = replace(Regex("NI;([\\S]*), OI;\\1([,!])")) { it.groupValues[1] + it.groupValues[2] }
-
-    protected open fun getExpectedDiagnosticsFile(testDataFile: File): File {
-        return testDataFile
-    }
-
-    protected open fun getExpectedDescriptorFile(testDataFile: File, files: List<TestFile>): File {
-        val originalTestFileText = testDataFile.readText()
-
-        val postfix = when {
-            InTextDirectivesUtils.isDirectiveDefined(originalTestFileText, "// JAVAC_EXPECTED_FILE") &&
-                    environment.configuration.getBoolean(JVMConfigurationKeys.USE_JAVAC) -> ".javac.txt"
-
-            InTextDirectivesUtils.isDirectiveDefined(originalTestFileText, "// NI_EXPECTED_FILE") &&
-                    files.any { it.newInferenceEnabled } && !USE_OLD_INFERENCE_DIAGNOSTICS_FOR_NI -> ".ni.txt"
-
-            else -> ".txt"
-        }
-
-        return File(FileUtil.getNameWithoutExtension(testDataFile.absolutePath) + postfix)
-    }
-
-    protected open fun performAdditionalChecksAfterDiagnostics(
-        testDataFile: File,
-        testFiles: List<TestFile>,
-        moduleFiles: Map<TestModule?, List<TestFile>>,
-        moduleDescriptors: Map<TestModule?, ModuleDescriptorImpl>,
-        moduleBindings: Map<TestModule?, BindingContext>,
-        languageVersionSettingsByModule: Map<TestModule?, LanguageVersionSettings>
-    ) {
-        // To be overridden by diagnostic-like tests.
-    }
-
-    protected open fun loadLanguageVersionSettings(module: List<TestFile>): LanguageVersionSettings {
-        var result: LanguageVersionSettings? = null
-        for (file in module) {
-            val current = file.customLanguageVersionSettings
-            if (current != null) {
-                if (result != null && result != current) {
-                    Assert.fail(
-                                "This is not supported. Please move all directives into one file"
-                    )
-                }
-                result = current
-            }
-        }
-
-        return result ?: defaultLanguageVersionSettings()
-    }
-
-    /**
-     * Version settings used when no test data files have overriding version directives
-     */
-    protected open fun defaultLanguageVersionSettings(): LanguageVersionSettings {
-        return CompilerTestLanguageVersionSettings(
-            DEFAULT_DIAGNOSTIC_TESTS_FEATURES,
-            LanguageVersionSettingsImpl.DEFAULT.apiVersion,
-            LanguageVersionSettingsImpl.DEFAULT.languageVersion
-        )
-    }
-
     protected open fun loadJvmTarget(module: List<TestFile>): JvmTarget {
         var result: JvmTarget? = null
         for (file in module) {
@@ -304,7 +403,7 @@ class Analyzer(disposable: Disposable) : BaseDiagnosticsTest() {
             if (current != null) {
                 if (result != null && result != current) {
                     Assert.fail(
-                                "This is not supported. Please move all directives into one file"
+                        "This is not supported. Please move all directives into one file"
                     )
                 }
                 result = current
@@ -640,7 +739,7 @@ class Analyzer(disposable: Disposable) : BaseDiagnosticsTest() {
         }
 
         if (unresolvedCallsOnElements.isNotEmpty()) {
-            TestCase.fail(
+            error(
                 "There are uncompleted resolved calls for the following elements:\n" +
                         unresolvedCallsOnElements.joinToString(separator = "\n") { element ->
                             val lineAndColumn = DiagnosticUtils.getLineAndColumnInPsiFile(element.containingFile, element.textRange)

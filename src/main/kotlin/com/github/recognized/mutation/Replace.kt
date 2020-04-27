@@ -1,5 +1,7 @@
 package com.github.recognized.mutation
 
+import com.github.recognized.Server
+import com.github.recognized.compile.resolveText
 import com.github.recognized.dataset.Sample
 import com.github.recognized.random.Chooser
 import com.github.recognized.random.shuffledSeq
@@ -28,20 +30,27 @@ class Replace(val random: Random, val subtreeChooser: Chooser<PsiElement, PsiEle
             }?.takeIf { it.parent != null }
         } as KtElement? ?: return null
         log.trace { "Replacing ${forReplace::class.simpleName}{${forReplace.text}} with ${replacement::class.simpleName}{${replacement.text}}" }
-        forReplace.astReplace(replacement)
-        return tree.file.text
+        val copy = tree.file.copy()
+        val forReplaceMirror = findForSamePath(copy, tree.file, forReplace) ?: error("Couldn't find mirror")
+        forReplaceMirror.astReplace(replacement)
+        val (newFile, newContext) = resolveText(copy.text, Server) ?: error("Failed resolve new text")
+        val replacementMirror = findForSamePath(newFile, copy, replacement) ?: error("Couldn't find replacement mirror")
+        return renameUnresolved(copy.text, replacementMirror, forReplace, newContext, tree.context)
     }
 }
 
-fun findInOut(parent: KtElement, child: KtElement) {
-    val context = parent.analyze()
-    val pseudocode = child.getContainingPseudocode(context)!!
+fun findForSamePath(source: PsiElement, mirror: PsiElement, find: PsiElement): PsiElement? {
+    if (mirror == find) {
+        return source
+    }
+    for (i in mirror.children.indices) {
+        val found = findForSamePath(source.children[i], mirror.children[i], find)
+        if (found != null) {
+            return found
+        }
+    }
+    return null
 }
-
-//fun canSubstitute(fromContext: PsiElement, from: PsiElement, toContext: PsiElement, to: PsiElement): Boolean {
-//    val fromInOut = findInOut(fromContext, from)
-//    val toInOut = findInOut(toContext, to)
-//}
 
 fun swappable(one: PsiElement, other: PsiElement): Boolean {
     val commonSuperClasses = commonSuperClass(one::class.java, other::class.java).filter {
