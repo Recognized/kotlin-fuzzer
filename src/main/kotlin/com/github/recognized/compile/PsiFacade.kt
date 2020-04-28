@@ -37,6 +37,7 @@ import com.intellij.openapi.roots.impl.DirectoryIndex
 import com.intellij.openapi.roots.impl.DirectoryIndexImpl
 import com.intellij.openapi.roots.impl.ProjectFileIndexImpl
 import com.intellij.openapi.roots.impl.ProjectRootManagerImpl
+import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.UserDataHolderBase
 import com.intellij.pom.PomModel
@@ -87,7 +88,7 @@ import java.nio.file.spi.FileTypeDetector
 
 private val log = logger("PsiFacade")
 
-data class PsiResult(val file: KtFile, val context: BindingContext)
+data class PsiResult(val file: KtFile, val context: BindingContext, val disposable: Disposable) : Disposable by disposable
 
 class PsiFacade(
     val parentDisposable: Disposable,
@@ -119,11 +120,6 @@ class PsiFacade(
                 ProjectJdkImpl("1.8", JavaSdkImpl())
             )
         }
-    }
-
-    fun getPsiExt(text: CharSequence): PsiResult? {
-        val (context, file) = Analyzer(parentDisposable).analyze(text.toString())
-        return PsiResult(file, context)
     }
 }
 

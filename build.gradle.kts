@@ -9,6 +9,7 @@ repositories {
 
 plugins {
     kotlin("jvm")
+    id("antlr")
 }
 
 val kotlinVersion = "1.3.60"
@@ -27,6 +28,7 @@ dependencies {
     implementation("org.apache.commons:commons-csv:1.1")
     implementation("org.apache.commons:commons-text:1.8")
     implementation("org.jsoup:jsoup:1.11.3")
+    antlr("org.antlr:antlr4:4.5")
 //    implementation("log4j:log4j:1.2.17")
     implementation("org.slf4j:slf4j-simple:1.7.29")
     implementation("org.apache.commons:commons-csv:1.1")
@@ -35,6 +37,8 @@ dependencies {
     implementation(project(":idea:idea-core"))
     implementation(project(":compiler:tests-common"))
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.10.+")
+    implementation(files("libs/kotlin-grammar-parser-0.1.jar"))
+    implementation("org.antlr:antlr4-runtime:4.4.5")
     compile(intellijDep())
 
     Platform[192].orHigher {
@@ -46,4 +50,9 @@ dependencies {
     testImplementation(kotlin("test"))
     testImplementation(kotlin("test-junit"))
     testImplementation("org.knowm.xchart:xchart:3.5.4")
+}
+
+tasks.generateGrammarSource {
+    outputDirectory = File("${project.buildDir}/generated-src/antlr/main/org/antlr/parser/antlr4")
+    arguments = arguments + listOf("-package", "org.antlr.parser.antlr4")
 }

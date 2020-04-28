@@ -1,19 +1,21 @@
 package com.github.recognized.mutation
 
-import com.github.recognized.Server
+import com.github.recognized.compile.TypeContext
 import com.github.recognized.compile.resolveText
 import com.github.recognized.dataset.Sample
 import com.github.recognized.random.Chooser
 import com.github.recognized.random.shuffledSeq
 import com.github.recognized.runtime.commonSuperClass
 import com.github.recognized.runtime.logger
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.psi.PsiElement
-import org.jetbrains.kotlin.cfg.pseudocode.getContainingPseudocode
-import org.jetbrains.kotlin.idea.caches.resolve.analyze
+import org.jetbrains.kotlin.idea.core.util.end
 import org.jetbrains.kotlin.psi.KtElement
 import org.jetbrains.kotlin.psi.KtElementImplStub
 import org.jetbrains.kotlin.psi.KtPureElement
 import org.jetbrains.kotlin.psi.psiUtil.astReplace
+import kotlin.math.min
 import kotlin.random.Random
 
 private val log = logger("Replace")
@@ -23,19 +25,21 @@ class Replace(val random: Random, val subtreeChooser: Chooser<PsiElement, PsiEle
     override fun mutate(corpus: List<Sample>, sample: Sample): String? {
         val tree = sample.tree ?: error("Psi construction failed")
         val forReplace = subtreeChooser.choose(random, tree.file)!!
-        val replacement = corpus.shuffledSeq(random).firstNotNull {
+        val (replacement, s1) = corpus.shuffledSeq(random).firstNotNull {
             val breed = it.tree ?: return@firstNotNull null
             subtreeChooser.choose(random, breed.file) {
                 swappable(it, forReplace)
-            }?.takeIf { it.parent != null }
-        } as KtElement? ?: return null
+            }?.takeIf { it.parent != null }?.let { x ->
+                x to it
+            }
+        } ?: return null
         log.trace { "Replacing ${forReplace::class.simpleName}{${forReplace.text}} with ${replacement::class.simpleName}{${replacement.text}}" }
-        val copy = tree.file.copy()
-        val forReplaceMirror = findForSamePath(copy, tree.file, forReplace) ?: error("Couldn't find mirror")
-        forReplaceMirror.astReplace(replacement)
-        val (newFile, newContext) = resolveText(copy.text, Server) ?: error("Failed resolve new text")
-        val replacementMirror = findForSamePath(newFile, copy, replacement) ?: error("Couldn't find replacement mirror")
-        return renameUnresolved(copy.text, replacementMirror, forReplace, newContext, tree.context)
+        val range = forReplace.textRange.startOffset until forReplace.textRange.endOffset
+        val copy = tree.file.text.replaceRange(range, replacement.text)
+        log.info { "Replace ${forReplace.text} -> ${replacement.text}" }
+        val (newFile, newContext) = resolveText(copy) ?: error("Failed resolve new text")
+        val replacementMirror = findForSamePath(newFile, tree.file, forReplace) ?: error("Couldn't find replacement mirror")
+        return renameUnresolved(copy, replacementMirror, newContext, s1.tree!!.context)
     }
 }
 
@@ -43,7 +47,7 @@ fun findForSamePath(source: PsiElement, mirror: PsiElement, find: PsiElement): P
     if (mirror == find) {
         return source
     }
-    for (i in mirror.children.indices) {
+    for (i in 0 until min(mirror.children.size, source.children.size)) {
         val found = findForSamePath(source.children[i], mirror.children[i], find)
         if (found != null) {
             return found

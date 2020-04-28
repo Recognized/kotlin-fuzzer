@@ -4,15 +4,15 @@
  */
 package com.github.recognized.compile
 
+import com.github.recognized.runtime.logger
 import com.intellij.core.CoreApplicationEnvironment
-import com.intellij.core.CoreFileTypeRegistry
 import com.intellij.ide.highlighter.FileTypeRegistrator
 import com.intellij.ide.util.ProjectPropertiesComponentImpl
 import com.intellij.ide.util.PropertiesComponent
-import com.intellij.lang.LanguageParserDefinitions
 import com.intellij.mock.MockEditorFactory
 import com.intellij.mock.MockProject
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.extensions.ExtensionPoint
 import com.intellij.openapi.extensions.Extensions
@@ -24,7 +24,6 @@ import com.intellij.openapi.fileTypes.impl.FileTypeOverrider
 import com.intellij.openapi.module.ModuleManager
 import com.intellij.openapi.module.impl.ModuleManagerComponent
 import com.intellij.openapi.options.SchemeManagerFactory
-import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ProjectFileIndex
 import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.roots.ProjectRootModificationTracker
@@ -38,14 +37,12 @@ import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.pom.PomModel
 import com.intellij.pom.core.impl.PomModelImpl
-import com.intellij.psi.LanguageFileViewProviders
+import com.intellij.pom.tree.TreeAspect
 import com.intellij.psi.PsiElement
 import com.intellij.psi.impl.source.tree.TreeCopyHandler
 import com.intellij.psi.search.GlobalSearchScope
-import com.intellij.rt.execution.junit.FileComparisonFailure
 import com.intellij.testFramework.MockSchemeManagerFactory
 import junit.framework.AssertionFailedError
-import junit.framework.TestCase
 import org.assertj.core.util.Files
 import org.jetbrains.kotlin.TestsCompilerError
 import org.jetbrains.kotlin.analyzer.AnalysisResult
@@ -58,9 +55,11 @@ import org.jetbrains.kotlin.checkers.BaseDiagnosticsTest
 import org.jetbrains.kotlin.checkers.CompilerTestLanguageVersionSettings
 import org.jetbrains.kotlin.checkers.LazyOperationsLog
 import org.jetbrains.kotlin.checkers.LoggingStorageManager
+import org.jetbrains.kotlin.cli.common.config.addKotlinSourceRoot
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment
 import org.jetbrains.kotlin.cli.jvm.compiler.NoScopeRecordCliBindingTrace
 import org.jetbrains.kotlin.cli.jvm.compiler.TopDownAnalyzerFacadeForJVM
+import org.jetbrains.kotlin.codegen.forTestCompile.ForTestCompileRuntime
 import org.jetbrains.kotlin.config.*
 import org.jetbrains.kotlin.container.get
 import org.jetbrains.kotlin.context.ModuleContext
@@ -76,17 +75,10 @@ import org.jetbrains.kotlin.diagnostics.Diagnostic
 import org.jetbrains.kotlin.diagnostics.DiagnosticFactory
 import org.jetbrains.kotlin.diagnostics.DiagnosticUtils
 import org.jetbrains.kotlin.diagnostics.Errors.*
-import org.jetbrains.kotlin.fir.AbstractFirOldFrontendDiagnosticsTest
-import org.jetbrains.kotlin.fir.loadTestDataWithoutDiagnostics
 import org.jetbrains.kotlin.frontend.java.di.createContainerForLazyResolveWithJava
 import org.jetbrains.kotlin.frontend.java.di.initJvmBuiltInsForTopDownAnalysis
-import org.jetbrains.kotlin.idea.KotlinFileType
-import org.jetbrains.kotlin.idea.KotlinLanguage
 import org.jetbrains.kotlin.idea.caches.project.LibraryModificationTracker
-import org.jetbrains.kotlin.idea.caches.resolve.IdePackageOracleFactory
 import org.jetbrains.kotlin.idea.caches.resolve.KotlinCacheServiceImpl
-import org.jetbrains.kotlin.idea.compiler.configuration.KotlinCommonCompilerArgumentsHolder
-import org.jetbrains.kotlin.idea.compiler.configuration.KotlinCompilerSettings
 import org.jetbrains.kotlin.idea.core.script.ScriptConfigurationManager
 import org.jetbrains.kotlin.idea.core.script.ScriptDependenciesModificationTracker
 import org.jetbrains.kotlin.idea.core.script.configuration.default
@@ -96,7 +88,6 @@ import org.jetbrains.kotlin.load.java.lazy.SingleModuleClassResolver
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.name.SpecialNames
-import org.jetbrains.kotlin.parsing.KotlinParserDefinition
 import org.jetbrains.kotlin.platform.DefaultIdeTargetPlatformKindProvider
 import org.jetbrains.kotlin.platform.IdePlatformKind
 import org.jetbrains.kotlin.platform.TargetPlatform
@@ -114,10 +105,7 @@ import org.jetbrains.kotlin.serialization.deserialization.MetadataPartProvider
 import org.jetbrains.kotlin.storage.ExceptionTracker
 import org.jetbrains.kotlin.storage.LockBasedStorageManager
 import org.jetbrains.kotlin.storage.StorageManager
-import org.jetbrains.kotlin.test.InTextDirectivesUtils
-import org.jetbrains.kotlin.test.KotlinTestUtils
-import org.jetbrains.kotlin.test.TargetBackend
-import org.jetbrains.kotlin.test.TestJdkKind
+import org.jetbrains.kotlin.test.*
 import org.jetbrains.kotlin.test.util.DescriptorValidator
 import org.jetbrains.kotlin.test.util.RecursiveDescriptorComparator
 import org.jetbrains.kotlin.test.util.RecursiveDescriptorComparator.RECURSIVE
@@ -196,18 +184,17 @@ object GlobalRegistrations {
 
     val fileTypeManager by lazy { FileTypeManagerImpl() }
     val mockSchemeManager by lazy { MockSchemeManagerFactory() }
-
-    val applicationEnv by lazy {
-
-    }
 }
 
-fun resolveText(text: String, disposable: Disposable): PsiResult? {
-    val (context, file) = Analyzer(disposable).analyze(text)
-    return PsiResult(file, context)
+fun resolveText(text: String): PsiResult? {
+    val disposable = Disposer.newDisposable()
+    val (context, file) = TypeContext.analyze(text, disposable)
+    return PsiResult(file, context, disposable)
 }
 
-class Analyzer(disposable: Disposable) : BaseDiagnosticsTest() {
+private val log = logger("TypeContext")
+
+object TypeContext : BaseDiagnosticsTest() {
     override fun analyzeAndCheck(testDataFile: File, files: List<TestFile>) {
         try {
             analyzeAndCheckUnhandled(testDataFile, files)
@@ -221,17 +208,32 @@ class Analyzer(disposable: Disposable) : BaseDiagnosticsTest() {
     }
 
     private val testPath = Files.newTemporaryFolder()
+    private val kotlinSourceRoot = KotlinTestUtils.tmpDir("kotlin-src")
 
     init {
-        Disposer.register(disposable, Disposable { testPath.deleteRecursively() })
+        Disposer.register(testRootDisposable, Disposable { testPath.deleteRecursively() })
         setUp()
+        environment = createEnvironment()
+        setupEnvironment(environment)
     }
+
+    override val project: MockProject = environment.project as MockProject
 
     override fun getTestJdkKind(files: List<TestFile>): TestJdkKind {
         return TestJdkKind.FULL_JDK
     }
 
-    fun analyze(text: String): Pair<BindingContext, KtFile> {
+    fun runInEdt(fn: () -> Unit) {
+        ApplicationManager.getApplication().invokeAndWait {
+            try {
+                fn()
+            } catch (ex: Throwable) {
+                log.error(ex)
+            }
+        }
+    }
+
+    fun analyze(text: String, disposable: Disposable): Pair<BindingContext, KtFile> {
         val file = File.createTempFile("test", "_.kt", testPath)
         file.bufferedWriter().use { it.write(text) }
         var expectedText = KotlinTestUtils.doLoadFile(file)
@@ -239,12 +241,30 @@ class Analyzer(disposable: Disposable) : BaseDiagnosticsTest() {
             expectedText = expectedText.replace("COROUTINES_PACKAGE", coroutinesPackage)
         }
         val files = createTestFilesFromFile(file, expectedText)
-        environment = createEnvironment(file, files)
-        //after environment initialization cause of `tearDown` logic, maybe it's obsolete
-        setupEnvironment(environment)
+
         return analyzeAndCheckUnhandled(file, files).first().let { it.context to it.files.first() }
     }
 
+    private fun createEnvironment(): KotlinCoreEnvironment {
+        val classpath: MutableList<File> = ArrayList()
+        classpath.add(KotlinTestUtils.getAnnotationsJar())
+        classpath.addAll(getExtraClasspath())
+        classpath.add(ForTestCompileRuntime.runtimeJarForTestsWithJdk8())
+        classpath.add(ForTestCompileRuntime.coroutinesCompatForTests())
+        val configuration = KotlinTestUtils.newConfiguration(
+            ConfigurationKind.ALL,
+            TestJdkKind.FULL_JDK,
+            classpath,
+            emptyList()
+        )
+        configuration.addKotlinSourceRoot(kotlinSourceRoot.path)
+
+        // Currently, we're testing IDE behavior when generating the .txt files for comparison, but this can be changed.
+        // The main difference is the fact that the new class file reading implementation doesn't load parameter names from JDK classes.
+//        configuration.put(JVMConfigurationKeys.USE_PSI_CLASS_FILES_READING, true)
+
+        return createForTests(testRootDisposable, configuration, getEnvironmentConfigFiles())
+    }
 
     override fun setupEnvironment(environment: KotlinCoreEnvironment) {
         val project = environment.project as MockProject
@@ -276,7 +296,7 @@ class Analyzer(disposable: Disposable) : BaseDiagnosticsTest() {
         project.registerIfNotExists(LibraryModificationTracker::class.java, LibraryModificationTracker(project))
         project.registerIfNotExists(ScriptDependenciesModificationTracker::class.java, ScriptDependenciesModificationTracker())
         project.registerIfNotExists(ProjectRootModificationTracker::class.java, ProjectRootModificationTrackerImpl(project))
-//        project.registerIfNotExists(PomModel::class.java, PomModelImpl(project))
+        project.registerIfNotExists(PomModel::class.java, PomModelImpl(project).also { TreeAspect(it) })
         project.registerIfNotExists(ScriptConfigurationManager::class.java, ScriptConfigurationManager.default(project))
         project.registerIfNotExists(KotlinCacheService::class.java, KotlinCacheServiceImpl(project))
 //        project.registerIfNotExists(KotlinCommonCompilerArgumentsHolder::class.java, KotlinCommonCompilerArgumentsHolder(project))
@@ -396,7 +416,7 @@ class Analyzer(disposable: Disposable) : BaseDiagnosticsTest() {
         return res
     }
 
-    protected open fun loadJvmTarget(module: List<TestFile>): JvmTarget {
+    open fun loadJvmTarget(module: List<TestFile>): JvmTarget {
         var result: JvmTarget? = null
         for (file in module) {
             val current = file.jvmTarget
@@ -430,7 +450,7 @@ class Analyzer(disposable: Disposable) : BaseDiagnosticsTest() {
         }
     }
 
-    protected open fun shouldSkipJvmSignatureDiagnostics(groupedByModule: Map<TestModule?, List<TestFile>>): Boolean =
+    open fun shouldSkipJvmSignatureDiagnostics(groupedByModule: Map<TestModule?, List<TestFile>>): Boolean =
         groupedByModule.size > 1
 
     private fun checkLazyResolveLog(lazyOperationsLog: LazyOperationsLog, testDataFile: File): Throwable? =
@@ -445,7 +465,7 @@ class Analyzer(disposable: Disposable) : BaseDiagnosticsTest() {
     private fun getLazyLogFile(testDataFile: File): File =
         File(FileUtil.getNameWithoutExtension(testDataFile.absolutePath) + ".lazy.log")
 
-    protected open fun analyzeModuleContents(
+    fun analyzeModuleContents(
         moduleContext: ModuleContext,
         files: List<KtFile>,
         moduleTrace: BindingTrace,
@@ -619,7 +639,7 @@ class Analyzer(disposable: Disposable) : BaseDiagnosticsTest() {
     }
 
 
-    protected open fun skipDescriptorsValidation(): Boolean = false
+    fun skipDescriptorsValidation(): Boolean = false
 
     private fun getJavaFilePackage(testFile: TestFile): Name {
         val pattern = Pattern.compile("^\\s*package [.\\w\\d]*", Pattern.MULTILINE)
@@ -704,16 +724,16 @@ class Analyzer(disposable: Disposable) : BaseDiagnosticsTest() {
         return modules
     }
 
-    protected open fun getAdditionalDependencies(module: ModuleDescriptorImpl): List<ModuleDescriptorImpl> =
+    fun getAdditionalDependencies(module: ModuleDescriptorImpl): List<ModuleDescriptorImpl> =
         emptyList()
 
-    protected open fun createModule(moduleName: String, storageManager: StorageManager): ModuleDescriptorImpl {
+    fun createModule(moduleName: String, storageManager: StorageManager): ModuleDescriptorImpl {
         val platform = parseModulePlatformByName(moduleName)
         val builtIns = JvmBuiltIns(storageManager, JvmBuiltIns.Kind.FROM_CLASS_LOADER)
         return ModuleDescriptorImpl(Name.special("<$moduleName>"), storageManager, builtIns, platform)
     }
 
-    protected open fun createSealedModule(storageManager: StorageManager): ModuleDescriptorImpl =
+    fun createSealedModule(storageManager: StorageManager): ModuleDescriptorImpl =
         createModule("test-module-jvm", storageManager).apply {
             setDependencies(this, builtIns.builtInsModule)
         }
@@ -788,9 +808,7 @@ class Analyzer(disposable: Disposable) : BaseDiagnosticsTest() {
                    resolvedCalls.all { (it as MutableResolvedCall<*>).isCompleted })
     }
 
-    companion object {
-        private val HASH_SANITIZER = fun(s: String): String = s.replace("@(\\d)+".toRegex(), "")
+    private val HASH_SANITIZER = fun(s: String): String = s.replace("@(\\d)+".toRegex(), "")
 
-        private val MODULE_FILES = ModuleDescriptor.Capability<List<KtFile>>("")
-    }
+    private val MODULE_FILES = ModuleDescriptor.Capability<List<KtFile>>("")
 }

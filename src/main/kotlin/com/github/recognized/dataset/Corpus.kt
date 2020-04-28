@@ -22,7 +22,7 @@ data class Sample(
     @JsonIgnore
     var parent: MutationInfo? = null
 
-    val tree by lazy { resolveText(file, Server) }
+    val tree by lazy { resolveText(file) }
 }
 
 fun Kodein.MainBuilder.corpuses() {

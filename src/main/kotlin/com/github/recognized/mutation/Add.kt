@@ -38,16 +38,16 @@ class Add(val random: Random, corpus: AllCorpuses, val subtreeChooser: Chooser<P
     private val mayHaveChildren = mutableSetOf<KClass<*>>()
 
     init {
-        corpus.samples()
-            .asSequence()
-            .mapNotNull { it.tree?.file?.asSequence() }
-            .flatMap { it }
-            .withProgress("Add children", log)
-            .forEach {
-                if (it.children.isNotEmpty()) {
-                    mayHaveChildren += it::class
-                }
-            }
+//        corpus.samples()
+//            .asSequence()
+//            .mapNotNull { it.tree?.file?.asSequence() }
+//            .flatMap { it }
+//            .withProgress("Add children", log)
+//            .forEach {
+//                if (it.children.isNotEmpty()) {
+//                    mayHaveChildren += it::class
+//                }
+//            }
     }
 
     override val name: String = "Add"

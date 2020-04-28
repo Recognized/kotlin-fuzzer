@@ -1,6 +1,5 @@
 package com.github.recognized
 
-import com.github.recognized.compile.Analyzer
 import com.github.recognized.compile.PsiFacade
 import com.github.recognized.dataset.corpuses
 import com.github.recognized.metrics.FitnessFunction
