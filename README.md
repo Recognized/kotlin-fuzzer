@@ -1,3 +1,5 @@
 # kotlin-fuzzer
 
-This is subproject of [kotlin project fork](https://github.com/Recognized/kotlin).  
+This is subproject of [Kotlin fork](https://github.com/Recognized/kotlin). 
+
+Use `:fuzzer:build` gradlew task in order to build and verify this repository.
